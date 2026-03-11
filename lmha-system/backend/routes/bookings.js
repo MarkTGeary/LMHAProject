@@ -75,7 +75,7 @@ function checkDoubleBooking(location, dateStr, timeStr, excludeId = null) {
 
 // GET /api/bookings — list with filters
 router.get('/', requireAuth, (req, res) => {
-  const { status, location, date, today, this_week, intake_status } = req.query;
+  const { status, location, date, today, this_week, intake_status, start_date, end_date } = req.query;
 
   let query = `
     SELECT b.*,
@@ -104,6 +104,9 @@ router.get('/', requireAuth, (req, res) => {
     sun.setDate(mon.getDate() + 6);
     query += ' AND b.date BETWEEN ? AND ?';
     params.push(mon.toISOString().slice(0, 10), sun.toISOString().slice(0, 10));
+  }
+  if (start_date && end_date) {
+    query += ' AND b.date BETWEEN ? AND ?'; params.push(start_date, end_date);
   }
   if (intake_status === 'missing') {
     query += ' AND i.id IS NULL';

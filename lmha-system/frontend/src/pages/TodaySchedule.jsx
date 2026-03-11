@@ -4,8 +4,22 @@ import { useAuth } from '../App'
 import Layout from '../components/Layout'
 
 const LOCATION_HOURS = {
-  'LMHA': { start: 11, end: 17 },
-  'Solace Café': { start: 18, end: 24 },
+  'LMHA':        { start: 11, end: 17, days: [1, 2, 3, 4, 5] },
+  'Solace Café': { start: 18, end: 24, days: [4, 5, 6, 0] },
+}
+const DAY_NAMES = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat']
+const DAY_FULL  = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday']
+
+function fmt(d) {
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0')
+}
+
+function getMondayOf(d) {
+  const c = new Date(d)
+  const day = c.getDay()
+  c.setDate(c.getDate() - (day === 0 ? 6 : day - 1))
+  c.setHours(0, 0, 0, 0)
+  return c
 }
 
 function timeToMins(t) {
@@ -13,162 +27,264 @@ function timeToMins(t) {
   return h * 60 + m
 }
 
-export default function TodaySchedule() {
+function getColor(b) {
+  if (b.status === 'Cancelled') return 'bg-red-200 border-red-300 text-red-800'
+  if (b.status === 'Closed')    return 'bg-gray-300 border-gray-400 text-gray-700'
+  if (!b.intake_complete)       return 'bg-orange-400 border-orange-500 text-white'
+  return 'bg-blue-500 border-blue-600 text-white'
+}
+
+export default function WeeklySchedule() {
   const { location } = useAuth()
-  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().slice(0, 10))
-  const [bookings, setBookings] = useState([])
-  const [loading, setLoading] = useState(true)
+  const hours = LOCATION_HOURS[location] || LOCATION_HOURS['LMHA']
+  const [weekStart, setWeekStart] = useState(() => getMondayOf(new Date()))
+  const [bookings, setBookings]   = useState([])
+  const [loading, setLoading]     = useState(true)
+  const [selected, setSelected]   = useState(null)
+
+  const visibleDays = Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(weekStart)
+    d.setDate(weekStart.getDate() + i)
+    return d
+  }).filter(d => hours.days.includes(d.getDay()))
 
   useEffect(() => {
     setLoading(true)
-    fetch(`/api/bookings/schedule?date=${selectedDate}&location=${encodeURIComponent(location)}`, { credentials: 'include' })
+    const start = fmt(weekStart)
+    const end   = fmt(new Date(weekStart.getTime() + 6 * 86400000))
+    fetch(
+      '/api/bookings?location=' + encodeURIComponent(location) + '&start_date=' + start + '&end_date=' + end,
+      { credentials: 'include' }
+    )
       .then(r => r.json())
       .then(data => { setBookings(Array.isArray(data) ? data : []); setLoading(false) })
       .catch(() => setLoading(false))
-  }, [selectedDate, location])
+  }, [weekStart, location])
 
-  const hours = LOCATION_HOURS[location] || { start: 9, end: 18 }
-  const totalMins = (hours.end - hours.start) * 60
+  const prevWeek = () => { const d = new Date(weekStart); d.setDate(d.getDate() - 7); setWeekStart(getMondayOf(d)) }
+  const nextWeek = () => { const d = new Date(weekStart); d.setDate(d.getDate() + 7); setWeekStart(getMondayOf(d)) }
+  const goToday  = () => { setWeekStart(getMondayOf(new Date())); setSelected(null) }
+  const todayStr = fmt(new Date())
+
+  const byDate = {}
+  bookings.forEach(b => {
+    if (!byDate[b.date]) byDate[b.date] = []
+    byDate[b.date].push(b)
+  })
+
+  const ROW_PX    = 68
+  const hourCount = hours.end - hours.start
+  const GRID_H    = hourCount * ROW_PX
   const startMins = hours.start * 60
+  const totalMins = hourCount * 60
 
-  const BOOKING_COLORS = {
-    Active: { bg: 'bg-blue-500', text: 'text-white', border: 'border-blue-600' },
-    Closed: { bg: 'bg-gray-400', text: 'text-white', border: 'border-gray-500' },
-    Cancelled: { bg: 'bg-red-300', text: 'text-white', border: 'border-red-400' },
-  }
+  const hourLabels = Array.from({ length: hourCount + 1 }, (_, i) => {
+    const h = hours.start + i
+    return h >= 24 ? '00:00' : String(h).padStart(2, '0') + ':00'
+  })
 
-  const getColor = (b) => {
-    if (!b.intake_complete && b.status === 'Active') return { bg: 'bg-orange-400', text: 'text-white', border: 'border-orange-500' }
-    return BOOKING_COLORS[b.status] || BOOKING_COLORS.Active
-  }
+  const nowPct = (() => {
+    const now = new Date()
+    if (fmt(now) !== todayStr) return null
+    const nm = now.getHours() * 60 + now.getMinutes()
+    if (nm < startMins || nm > startMins + totalMins) return null
+    return ((nm - startMins) / totalMins) * 100
+  })()
+
+  const weekLabel = visibleDays.length > 0 ? (() => {
+    const s = visibleDays[0]
+    const e = visibleDays[visibleDays.length - 1]
+    return s.getDate() + ' ' + s.toLocaleString('en-IE', { month: 'short' }) +
+      ' to ' + e.getDate() + ' ' + e.toLocaleString('en-IE', { month: 'short', year: 'numeric' })
+  })() : ''
 
   return (
-    <Layout title="Today's Schedule">
-      <div className="space-y-5">
-        {/* Date picker */}
-        <div className="card p-4 flex gap-3 items-center">
-          <label className="label mb-0">Date:</label>
-          <input
-            type="date"
-            className="input flex-1"
-            value={selectedDate}
-            onChange={e => setSelectedDate(e.target.value)}
-          />
-          <button
-            onClick={() => setSelectedDate(new Date().toISOString().slice(0, 10))}
-            className="btn-secondary btn-sm"
-          >
-            Today
-          </button>
+    <Layout title="Weekly Schedule">
+      <div className="space-y-4 pb-10">
+
+        <div className="card p-3 flex items-center gap-3">
+          <button onClick={prevWeek} className="btn-secondary btn-sm px-4">Prev</button>
+          <div className="flex-1 text-center font-bold">{weekLabel}</div>
+          <button onClick={nextWeek} className="btn-secondary btn-sm px-4">Next</button>
+          <button onClick={goToday} className="btn-primary btn-sm">Today</button>
         </div>
 
-        {/* Legend */}
-        <div className="flex flex-wrap gap-2 text-sm">
-          <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-blue-500 inline-block" /> Active</span>
-          <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-orange-400 inline-block" /> No Intake</span>
-          <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-gray-400 inline-block" /> Closed</span>
+        <div className="flex flex-wrap gap-3 text-sm px-1">
+          <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-blue-500 inline-block" /> Active</span>
+          <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-orange-400 inline-block" /> No intake</span>
+          <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-gray-400 inline-block" /> Closed</span>
         </div>
 
-        {/* Timeline */}
-        <div className="card overflow-x-auto">
-          {loading ? (
-            <div className="py-10 text-center text-gray-500">Loading...</div>
-          ) : (
-            <div className="relative" style={{ minHeight: `${(hours.end - hours.start) * 60}px` }}>
-              {/* Hour gridlines */}
-              {Array.from({ length: hours.end - hours.start + 1 }, (_, i) => i + hours.start).map(h => {
-                const top = ((h - hours.start) / (hours.end - hours.start)) * 100
-                return (
-                  <div
-                    key={h}
-                    className="absolute w-full flex items-center"
-                    style={{ top: `${((h * 60 - startMins) / totalMins) * 100}%` }}
-                  >
-                    <span className="text-xs text-gray-400 w-12 shrink-0 pr-2 text-right">
-                      {h === 24 ? '00:00' : `${h.toString().padStart(2, '0')}:00`}
-                    </span>
-                    <div className="flex-1 border-t border-gray-200" />
+        {loading ? (
+          <div className="card py-16 text-center text-gray-500 text-lg">Loading...</div>
+        ) : (
+          <div className="card p-0 overflow-hidden">
+            <div className="overflow-x-auto">
+              <div style={{ minWidth: (visibleDays.length * 130 + 52) + 'px' }}>
+
+                <div className="flex border-b-2 border-gray-200 bg-gray-50">
+                  <div className="shrink-0 border-r border-gray-200" style={{ width: 52 }} />
+                  {visibleDays.map(d => {
+                    const ds = fmt(d)
+                    const isToday = ds === todayStr
+                    const count = (byDate[ds] || []).length
+                    return (
+                      <div key={ds} className={'flex-1 text-center py-2 px-1 border-l border-gray-200' + (isToday ? ' bg-blue-50' : '')}>
+                        <div className={'text-xs font-bold uppercase tracking-widest ' + (isToday ? 'text-blue-600' : 'text-gray-400')}>
+                          {DAY_NAMES[d.getDay()]}
+                        </div>
+                        <div className={'text-2xl font-bold ' + (isToday ? 'text-blue-700' : 'text-gray-800')}>
+                          {d.getDate()}
+                        </div>
+                        <div className={'text-xs mt-0.5 ' + (count > 0 ? 'text-blue-600 font-semibold' : 'text-gray-300')}>
+                          {count > 0 ? count + ' booked' : 'free'}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+
+                <div className="flex" style={{ height: GRID_H }}>
+                  <div className="shrink-0 relative border-r border-gray-200" style={{ width: 52 }}>
+                    {hourLabels.map((label, i) => (
+                      <div key={label} className="absolute w-full" style={{ top: i * ROW_PX - 9 }}>
+                        <span className="block text-right pr-2 text-xs text-gray-400">{label}</span>
+                      </div>
+                    ))}
                   </div>
-                )
-              })}
 
-              {/* Current time indicator */}
-              {selectedDate === new Date().toISOString().slice(0, 10) && (() => {
-                const now = new Date()
-                const nowMins = now.getHours() * 60 + now.getMinutes()
-                if (nowMins >= startMins && nowMins <= startMins + totalMins) {
-                  const pct = ((nowMins - startMins) / totalMins) * 100
-                  return (
-                    <div className="absolute w-full flex items-center z-20 pointer-events-none"
-                      style={{ top: `${pct}%` }}>
-                      <span className="w-12 text-right pr-2 text-xs text-red-500 font-bold">NOW</span>
-                      <div className="flex-1 border-t-2 border-red-500" />
-                    </div>
-                  )
-                }
-              })()}
+                  {visibleDays.map(d => {
+                    const ds = fmt(d)
+                    const isToday = ds === todayStr
+                    const dayBookings = byDate[ds] || []
+                    return (
+                      <div key={ds}
+                        className={'flex-1 relative border-l border-gray-200' + (isToday ? ' bg-blue-50/30' : '')}
+                        style={{ height: GRID_H }}
+                      >
+                        {hourLabels.map((_, i) => (
+                          <div key={i} className="absolute w-full border-t border-gray-100" style={{ top: i * ROW_PX }} />
+                        ))}
 
-              {/* Booking blocks */}
-              <div className="ml-12 relative">
-                {bookings.map(b => {
-                  const bMins = timeToMins(b.time_booked)
-                  const topPct = ((bMins - startMins) / totalMins) * 100
-                  const heightPct = (60 / totalMins) * 100 // 1-hour slots
-                  const c = getColor(b)
-                  return (
-                    <Link
-                      key={b.id}
-                      to={`/bookings/${b.id}/outcome`}
-                      className={`absolute left-0 right-2 rounded-xl border-2 p-2 ${c.bg} ${c.text} ${c.border} overflow-hidden hover:opacity-90 transition-opacity`}
-                      style={{
-                        top: `${topPct}%`,
-                        height: `${heightPct}%`,
-                        minHeight: '40px',
-                      }}
-                    >
-                      <div className="font-bold text-sm truncate">{b.full_name || '—'}</div>
-                      <div className="text-xs opacity-90">{b.time_booked} • {b.interaction_type}</div>
-                      {!b.intake_complete && <div className="text-xs font-bold">⚠ No intake</div>}
-                    </Link>
-                  )
-                })}
+                        {isToday && nowPct !== null && (
+                          <div className="absolute w-full z-20 pointer-events-none" style={{ top: nowPct + '%' }}>
+                            <div className="border-t-2 border-red-500 relative">
+                              <span className="absolute -top-2 left-0 text-xs text-red-500 font-bold bg-white px-1 rounded shadow">NOW</span>
+                            </div>
+                          </div>
+                        )}
 
-                {bookings.length === 0 && (
-                  <div className="flex items-center justify-center h-full min-h-[200px] text-gray-400">
-                    <div className="text-center">
-                      <div className="text-3xl mb-2">📭</div>
-                      <div>No bookings for this day</div>
-                      <Link to="/bookings/new" className="btn-primary btn-sm mt-3 inline-flex">
-                        New Booking
-                      </Link>
-                    </div>
-                  </div>
-                )}
+                        {dayBookings.map(b => {
+                          const topPx = ((timeToMins(b.time_booked) - startMins) / 60) * ROW_PX + 2
+                          const isSel = selected && selected.id === b.id
+                          return (
+                            <button key={b.id}
+                              onClick={() => setSelected(isSel ? null : b)}
+                              className={'absolute inset-x-1 rounded-lg border text-left px-2 py-1 overflow-hidden hover:brightness-90 z-10 ' + getColor(b) + (isSel ? ' ring-2 ring-yellow-300 ring-offset-1' : '')}
+                              style={{ top: topPx, height: ROW_PX - 4 }}
+                            >
+                              <div className="font-bold text-xs leading-tight truncate">{b.full_name || 'Unknown'}</div>
+                              <div className="text-xs opacity-80">{b.time_booked}</div>
+                              {!b.intake_complete && b.status === 'Active' && (
+                                <div className="text-xs font-bold">no intake</div>
+                              )}
+                            </button>
+                          )
+                        })}
+
+                        {dayBookings.length === 0 && (
+                          <Link to="/bookings/new"
+                            className="absolute inset-0 flex items-center justify-center text-gray-200 hover:text-blue-300 hover:bg-blue-50 transition-colors text-3xl">
+                            +
+                          </Link>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
               </div>
             </div>
-          )}
-        </div>
-
-        {/* Booking list below timeline */}
-        {bookings.length > 0 && (
-          <div className="space-y-2">
-            <h3 className="font-bold text-gray-700">All bookings ({bookings.length})</h3>
-            {bookings.map(b => (
-              <div key={b.id} className="card p-4 flex items-center justify-between gap-3">
-                <div>
-                  <div className="font-bold">{b.full_name || '—'}</div>
-                  <div className="text-sm text-gray-500">{b.time_booked} • {b.interaction_type}</div>
-                </div>
-                <div className="flex gap-2">
-                  {!b.intake_complete && (
-                    <Link to={`/bookings/${b.id}/intake`} className="btn-warning btn-sm">Intake</Link>
-                  )}
-                  <Link to={`/bookings/${b.id}/outcome`} className="btn-success btn-sm">Outcome</Link>
-                </div>
-              </div>
-            ))}
           </div>
         )}
+
+        {selected && (
+          <div className="card border-2 border-blue-300 bg-blue-50">
+            <div className="flex items-start justify-between gap-3 mb-3">
+              <div>
+                <div className="font-bold text-xl">{selected.full_name || 'Unknown'}</div>
+                <div className="text-gray-600 mt-0.5">
+                  {DAY_FULL[new Date(selected.date + 'T12:00:00').getDay()]}{' '}
+                  {new Date(selected.date + 'T12:00:00').toLocaleDateString('en-IE', { day: 'numeric', month: 'long' })}
+                  {' at '}<strong>{selected.time_booked}</strong>
+                </div>
+                <div className="text-sm text-gray-500 mt-0.5">{selected.interaction_type} · {selected.new_or_repeat}</div>
+              </div>
+              <button onClick={() => setSelected(null)} className="text-3xl text-gray-400 hover:text-gray-700">x</button>
+            </div>
+            <div className="flex flex-wrap gap-2 mb-4">
+              <span className={'badge ' + (selected.status === 'Active' ? 'badge-active' : 'badge-closed')}>{selected.status}</span>
+              <span className={'badge ' + (selected.outcome === 'Attended' ? 'badge-attended' : selected.outcome === 'Did Not Attend' ? 'badge-dna' : 'badge-pending')}>
+                {selected.outcome || 'Pending'}
+              </span>
+              {selected.intake_complete
+                ? <span className="badge-intake-done">Intake done</span>
+                : <span className="badge-intake-missing">Intake missing</span>
+              }
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Link to={'/bookings/' + selected.id + '/edit'} className="btn-secondary btn-sm">Edit</Link>
+              {!selected.intake_complete
+                ? <Link to={'/bookings/' + selected.id + '/intake'} className="btn-warning btn-sm">Complete Intake</Link>
+                : <Link to={'/bookings/' + selected.id + '/intake'} className="btn-outline btn-sm">View Intake</Link>
+              }
+              {selected.status === 'Active' && (
+                <Link to={'/bookings/' + selected.id + '/outcome'} className="btn-success btn-sm">Record Outcome</Link>
+              )}
+            </div>
+          </div>
+        )}
+
+        {!loading && bookings.length > 0 && (
+          <div className="space-y-3">
+            <h3 className="font-bold text-gray-700 text-lg">Week summary ({bookings.length} bookings)</h3>
+            {visibleDays.map(d => {
+              const ds = fmt(d)
+              const dayBookings = byDate[ds] || []
+              if (!dayBookings.length) return null
+              return (
+                <div key={ds}>
+                  <div className={'text-sm font-bold mb-1.5 ' + (ds === todayStr ? 'text-blue-600' : 'text-gray-600')}>
+                    {DAY_FULL[d.getDay()]} {d.getDate()}{ds === todayStr ? ' - Today' : ''}
+                  </div>
+                  <div className="space-y-2">
+                    {dayBookings.map(b => (
+                      <div key={b.id} className="card p-3 flex items-center justify-between gap-3">
+                        <div className="min-w-0">
+                          <div className="font-semibold truncate">{b.full_name || 'Unknown'}</div>
+                          <div className="text-sm text-gray-500">{b.time_booked} · {b.interaction_type}</div>
+                        </div>
+                        <div className="flex gap-2 shrink-0">
+                          {!b.intake_complete && b.status === 'Active' && (
+                            <Link to={'/bookings/' + b.id + '/intake'} className="btn-warning btn-sm">Intake</Link>
+                          )}
+                          <Link to={'/bookings/' + b.id + '/outcome'} className="btn-success btn-sm">Outcome</Link>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )}
+
+        {!loading && bookings.length === 0 && (
+          <div className="card text-center py-10">
+            <div className="text-gray-500 text-lg">No bookings this week</div>
+            <Link to="/bookings/new" className="btn-primary mt-4 inline-flex">New Booking</Link>
+          </div>
+        )}
+
       </div>
     </Layout>
   )
