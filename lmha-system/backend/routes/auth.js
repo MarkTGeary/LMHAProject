@@ -2,6 +2,12 @@ const express = require('express');
 const passport = require('passport');
 const router = express.Router();
 
+// Dev bypass — skip Google auth, log straight in
+router.post('/dev-login', (req, res) => {
+  req.session.devUser = { id: 'dev', email: 'dev@lmha.ie', name: 'Dev User', picture: null };
+  res.json({ ok: true });
+});
+
 // Google OAuth login
 router.get('/google',
   passport.authenticate('google', { scope: ['profile', 'email'] })
@@ -21,13 +27,10 @@ router.get('/failure', (req, res) => {
 
 // Get current session user
 router.get('/me', (req, res) => {
-  if (req.isAuthenticated()) {
+  const user = req.session?.devUser || (req.isAuthenticated() ? req.user : null);
+  if (user) {
     return res.json({
-      user: {
-        email: req.user.email,
-        name: req.user.name,
-        picture: req.user.picture,
-      },
+      user: { email: user.email, name: user.name, picture: user.picture },
       location: req.session.location || null,
     });
   }
@@ -36,7 +39,7 @@ router.get('/me', (req, res) => {
 
 // Set location for session
 router.post('/location', (req, res) => {
-  if (!req.isAuthenticated()) {
+  if (!req.isAuthenticated() && !req.session?.devUser) {
     return res.status(401).json({ error: 'Not authenticated' });
   }
   const { location } = req.body;
