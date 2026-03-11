@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm install:*)",
+      "Bash(node -e \"const db = require\\(''better-sqlite3''\\); console.log\\(''ok''\\)\")",
+      "Bash(node --experimental-sqlite -e \"const { DatabaseSync } = require\\(''node:sqlite''\\); const db = new DatabaseSync\\('':memory:''\\); console.log\\(''node:sqlite OK''\\)\")",
+      "Bash(node -e \"const { DatabaseSync } = require\\(''node:sqlite''\\); console.log\\(''works without flag''\\)\")",
+      "Bash(node -e \":*)",
+      "Bash(npm run:*)",
+      "Bash(node --no-warnings -e \":*)"
+    ]
+  }
+}

@@ -1,0 +1,9 @@
+node_modules/
+backend/node_modules/
+frontend/node_modules/
+backend/lmha.db
+backend/sessions/
+backend/.env
+backend/service-account-key.json
+frontend/dist/
+*.log
