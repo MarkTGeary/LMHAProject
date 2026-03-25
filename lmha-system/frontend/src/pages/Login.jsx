@@ -3,16 +3,10 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../App'
 
 export default function Login() {
-  const { user, setUser } = useAuth()
+  const { user } = useAuth()
   const navigate = useNavigate()
   const [params] = useSearchParams()
   const error = params.get('error')
-
-  const devLogin = async () => {
-    await fetch('/auth/dev-login', { method: 'POST', credentials: 'include' })
-    setUser({ id: 'dev', email: 'dev@lmha.ie', name: 'Dev User', picture: null })
-    navigate('/location')
-  }
 
   useEffect(() => {
     if (user) navigate('/location')
@@ -37,12 +31,12 @@ export default function Login() {
           </div>
         )}
 
-        <button
-          onClick={devLogin}
-          className="btn-primary btn-lg w-full flex items-center justify-center gap-3"
-        >
-          Enter System
-        </button>
+        <a href="http://localhost:3000/auth/google" className="w-full">
+          <button className="btn-primary btn-lg w-full flex items-center justify-center gap-3">
+            <img src="https://www.google.com/favicon.ico" className="w-5 h-5" alt="" />
+            Sign in with Google
+          </button>
+        </a>
 
         <p className="text-xs text-gray-400 mt-6">
           Staff access only.

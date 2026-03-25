@@ -8,12 +8,6 @@ export default function Layout({ children, title, back }) {
 
   const switchLocation = () => {
     setLocation(null)
-    fetch('/auth/location', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      body: JSON.stringify({ location: '' }),
-    }).catch(() => {})
     nav('/location')
   }
 

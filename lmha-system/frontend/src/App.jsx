@@ -10,7 +10,6 @@ import IntakeForm from './pages/IntakeForm'
 import OutcomeForm from './pages/OutcomeForm'
 import MetricsDashboard from './pages/MetricsDashboard'
 
-// Auth context
 export const AuthContext = createContext(null)
 
 export function useAuth() {
@@ -41,8 +40,8 @@ export default function App() {
     fetch('/auth/me', { credentials: 'include' })
       .then(r => r.json())
       .then(data => {
-        if (data.user) {
-          setUser(data.user)
+        if (data.email) {
+          setUser(data)
           if (data.location) setLocation(data.location)
         }
       })
@@ -51,7 +50,7 @@ export default function App() {
   }, [])
 
   const logout = async () => {
-    await fetch('/auth/logout', { method: 'POST', credentials: 'include' })
+    await fetch('/auth/logout', { credentials: 'include' })
     setUser(null)
     setLocation(null)
   }

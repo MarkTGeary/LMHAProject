@@ -2,61 +2,45 @@ const express = require('express');
 const passport = require('passport');
 const router = express.Router();
 
-// Dev bypass — skip Google auth, log straight in
-router.post('/dev-login', (req, res) => {
-  req.session.devUser = { id: 'dev', email: 'dev@lmha.ie', name: 'Dev User', picture: null };
-  res.json({ ok: true });
+// Kick off Google login, store location in session for after callback
+router.get('/google', (req, res, next) => {
+  if (req.query.location) {
+    req.session.pendingLocation = req.query.location;
+  }
+  passport.authenticate('google', { scope: ['profile', 'email'] })(req, res, next);
 });
 
-// Google OAuth login
-router.get('/google',
-  passport.authenticate('google', { scope: ['profile', 'email'] })
-);
-
-// Google OAuth callback
+// Google redirects back here
 router.get('/google/callback',
-  passport.authenticate('google', { failureRedirect: '/auth/failure' }),
+  passport.authenticate('google', {
+    failureRedirect: 'http://localhost:5173/login?error=unauthorized',
+  }),
   (req, res) => {
+    const location = req.session.pendingLocation;
+    delete req.session.pendingLocation;
+
+    if (location) {
+      // They came from location select — send them to the app with location set
+      req.session.location = location;
+      return res.redirect('http://localhost:5173/dashboard');
+    }
+
+    // Normal login flow — send to location select first
     res.redirect('http://localhost:5173/location');
   }
 );
 
-router.get('/failure', (req, res) => {
-  res.redirect('http://localhost:5173/login?error=unauthorized');
-});
-
-// Get current session user
+// Frontend calls this to get current user + location
 router.get('/me', (req, res) => {
-  const user = req.session?.devUser || (req.isAuthenticated() ? req.user : null);
-  if (user) {
-    return res.json({
-      user: { email: user.email, name: user.name, picture: user.picture },
-      location: req.session.location || null,
-    });
-  }
-  res.status(401).json({ user: null });
-});
-
-// Set location for session
-router.post('/location', (req, res) => {
-  if (!req.isAuthenticated() && !req.session?.devUser) {
-    return res.status(401).json({ error: 'Not authenticated' });
-  }
-  const { location } = req.body;
-  if (!['LMHA', 'Solace Café'].includes(location)) {
-    return res.status(400).json({ error: 'Invalid location' });
-  }
-  req.session.location = location;
-  res.json({ ok: true, location });
-});
-
-// Logout
-router.post('/logout', (req, res) => {
-  req.logout((err) => {
-    if (err) return res.status(500).json({ error: 'Logout failed' });
-    req.session.destroy();
-    res.json({ ok: true });
+  if (!req.isAuthenticated()) return res.status(401).json({ error: 'Not authenticated' });
+  res.json({
+    ...req.user,
+    location: req.session.location || null,
   });
+});
+
+router.get('/logout', (req, res) => {
+  req.logout(() => res.redirect('http://localhost:5173'));
 });
 
 module.exports = router;

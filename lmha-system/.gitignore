@@ -7,3 +7,4 @@ backend/.env
 backend/service-account-key.json
 frontend/dist/
 *.log
+.claude

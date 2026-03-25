@@ -2,22 +2,12 @@ import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../App'
 
 export default function LocationSelect() {
-  const { user, setLocation, logout } = useAuth()
+  const { user, logout } = useAuth()
   const navigate = useNavigate()
 
-  const select = async (loc) => {
-    const res = await fetch('/auth/location', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      body: JSON.stringify({ location: loc }),
-    })
-    if (res.ok) {
-      setLocation(loc)
-      navigate('/')
-    }
+  const select = (loc) => {
+    window.location.href = `/auth/google?location=${encodeURIComponent(loc)}`
   }
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 to-slate-700 flex items-center justify-center p-6">
       <div className="w-full max-w-lg">
