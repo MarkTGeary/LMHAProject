@@ -83,6 +83,12 @@ app.use('/api/metrics', require('./routes/metrics'));
 // Health check
 app.get('/api/health', (req, res) => res.json({ ok: true, timestamp: new Date().toISOString() }));
 
+// Global error handler — logs the real error instead of silently returning 500
+app.use((err, req, res, _next) => {
+  console.error('[ERROR]', req.method, req.path, err.message || err);
+  res.status(500).json({ error: err.message || 'Internal server error' });
+});
+
 app.listen(PORT, () => {
   console.log(`LMHA backend running on http://localhost:${PORT}`);
   console.log(`Allowed emails: ${ALLOWED_EMAILS.join(', ') || '(none configured)'}`);

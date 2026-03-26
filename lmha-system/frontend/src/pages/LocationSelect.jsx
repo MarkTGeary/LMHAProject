@@ -2,11 +2,22 @@ import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../App'
 
 export default function LocationSelect() {
-  const { user, logout } = useAuth()
+  const { user, logout, setLocation } = useAuth()
   const navigate = useNavigate()
 
-  const select = (loc) => {
-    window.location.href = `/auth/google?location=${encodeURIComponent(loc)}`
+  const select = async (loc) => {
+    try {
+      await fetch('/auth/location', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ location: loc }),
+      })
+    } catch (e) {
+      // session save failed server-side, but location is still set in memory
+    }
+    setLocation(loc)
+    navigate('/')
   }
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 to-slate-700 flex items-center justify-center p-6">

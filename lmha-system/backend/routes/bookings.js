@@ -50,13 +50,14 @@ function checkDoubleBooking(location, dateStr, timeStr, excludeId = null) {
   const [hours, minutes] = timeStr.split(':').map(Number);
   const newMins = hours * 60 + minutes;
 
+  const params = excludeId ? [location, dateStr, excludeId] : [location, dateStr];
   const existing = db.prepare(
     `SELECT id, time_booked, service_user_id,
             (SELECT full_name FROM service_users WHERE id = bookings.service_user_id) as name
      FROM bookings
      WHERE location = ? AND date = ? AND status != 'Cancelled'
      ${excludeId ? 'AND id != ?' : ''}`
-  ).all(excludeId ? [location, dateStr, excludeId] : [location, dateStr]);
+  ).all(...params);
 
   for (const b of existing) {
     const [bh, bm] = b.time_booked.split(':').map(Number);
@@ -136,6 +137,41 @@ router.get('/schedule', requireAuth, (req, res) => {
     ORDER BY b.time_booked ASC
   `).all(date, location);
   res.json(rows);
+});
+
+// GET /api/bookings/available-slots?date=&location= — available time slots
+router.get('/available-slots', requireAuth, (req, res) => {
+  const { date, location } = req.query;
+  if (!date || !location) return res.status(400).json({ error: 'date and location required' });
+
+  const rules = LOCATION_RULES[location];
+  if (!rules) return res.status(400).json({ error: 'Unknown location' });
+
+  const d = new Date(date);
+  const dayOfWeek = d.getDay();
+
+  if (!rules.days.includes(dayOfWeek)) {
+    return res.json({ available: false, reason: `${location} is closed on this day`, slots: [] });
+  }
+
+  const existing = db.prepare(
+    `SELECT time_booked FROM bookings WHERE location = ? AND date = ? AND status != 'Cancelled'`
+  ).all(location, date);
+
+  const bookedMins = existing.map(b => {
+    const [h, m] = b.time_booked.split(':').map(Number);
+    return h * 60 + m;
+  });
+
+  const slots = [];
+  for (let mins = rules.startHour * 60; mins <= (rules.endHour - 1) * 60; mins += 30) {
+    const isBooked = bookedMins.some(bm => Math.abs(bm - mins) < 60);
+    const h = Math.floor(mins / 60).toString().padStart(2, '0');
+    const m = (mins % 60).toString().padStart(2, '0');
+    slots.push({ time: `${h}:${m}`, available: !isBooked });
+  }
+
+  res.json({ available: true, slots });
 });
 
 // GET /api/bookings/:id
@@ -279,41 +315,6 @@ router.patch('/:id', requireAuth, (req, res) => {
 
   const updated = db.prepare('SELECT * FROM bookings WHERE id = ?').get(req.params.id);
   res.json(updated);
-});
-
-// GET /api/bookings/slots?date=&location= — available time slots
-router.get('/available-slots', requireAuth, (req, res) => {
-  const { date, location } = req.query;
-  if (!date || !location) return res.status(400).json({ error: 'date and location required' });
-
-  const rules = LOCATION_RULES[location];
-  if (!rules) return res.status(400).json({ error: 'Unknown location' });
-
-  const d = new Date(date);
-  const dayOfWeek = d.getDay();
-
-  if (!rules.days.includes(dayOfWeek)) {
-    return res.json({ available: false, reason: `${location} is closed on this day`, slots: [] });
-  }
-
-  const existing = db.prepare(
-    `SELECT time_booked FROM bookings WHERE location = ? AND date = ? AND status != 'Cancelled'`
-  ).all(location, date);
-
-  const bookedMins = existing.map(b => {
-    const [h, m] = b.time_booked.split(':').map(Number);
-    return h * 60 + m;
-  });
-
-  const slots = [];
-  for (let mins = rules.startHour * 60; mins <= (rules.endHour - 1) * 60; mins += 30) {
-    const isBooked = bookedMins.some(bm => Math.abs(bm - mins) < 60);
-    const h = Math.floor(mins / 60).toString().padStart(2, '0');
-    const m = (mins % 60).toString().padStart(2, '0');
-    slots.push({ time: `${h}:${m}`, available: !isBooked });
-  }
-
-  res.json({ available: true, slots });
 });
 
 module.exports = router;
