@@ -75,10 +75,11 @@ passport.deserializeUser((user, done) => done(null, user));
 
 // Routes
 app.use('/auth', require('./routes/auth'));
-app.use('/api/bookings', require('./routes/bookings'));
-app.use('/api/service-users', require('./routes/serviceUsers'));
-app.use('/api/intake-forms', require('./routes/intakeForms'));
-app.use('/api/metrics', require('./routes/metrics'));
+const { requireLocation } = require('./middleware/requireAuth');
+app.use('/api/bookings', requireLocation, require('./routes/bookings'));
+app.use('/api/service-users', requireLocation, require('./routes/serviceUsers'));
+app.use('/api/intake-forms', requireLocation, require('./routes/intakeForms'));
+app.use('/api/metrics', requireLocation, require('./routes/metrics'));
 
 // Health check
 app.get('/api/health', (req, res) => res.json({ ok: true, timestamp: new Date().toISOString() }));
@@ -86,7 +87,8 @@ app.get('/api/health', (req, res) => res.json({ ok: true, timestamp: new Date().
 // Global error handler — logs the real error instead of silently returning 500
 app.use((err, req, res, _next) => {
   console.error('[ERROR]', req.method, req.path, err.message || err);
-  res.status(500).json({ error: err.message || 'Internal server error' });
+  const isDev = process.env.NODE_ENV !== 'production';
+  res.status(500).json({ error: isDev ? (err.message || 'Internal server error') : 'Internal server error' });
 });
 
 app.listen(PORT, () => {

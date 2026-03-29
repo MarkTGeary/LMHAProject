@@ -9,6 +9,9 @@ router.get('/booking/:bookingId', requireAuth, (req, res) => {
   if (!row) return res.status(404).json({ error: 'No intake form for this booking' });
   // Parse JSON arrays
   if (row.reasons_for_attending) row.reasons_for_attending = JSON.parse(row.reasons_for_attending);
+  if (row.support_needs) row.support_needs = JSON.parse(row.support_needs);
+  if (row.onward_referrals) row.onward_referrals = JSON.parse(row.onward_referrals);
+  if (row.limitations_detail) row.limitations_detail = JSON.parse(row.limitations_detail);
   res.json(row);
 });
 
@@ -26,6 +29,8 @@ router.post('/', requireAuth, (req, res) => {
     reasons_for_attending,
     privacy_acknowledged, safety_agreement_acknowledged, confidentiality_limits_explained,
     staff_member, staff_signature, signed_date,
+    // Optional extra sections
+    support_needs, onward_referrals, limitations_detail,
     // Repeat user
     is_repeat, existing_user_id,
   } = req.body;
@@ -124,6 +129,9 @@ router.post('/', requireAuth, (req, res) => {
         staff_member = ?,
         staff_signature = ?,
         signed_date = ?,
+        support_needs = COALESCE(?, support_needs),
+        onward_referrals = COALESCE(?, onward_referrals),
+        limitations_detail = COALESCE(?, limitations_detail),
         completed_at = datetime('now')
       WHERE booking_id = ?
     `).run(
@@ -133,6 +141,9 @@ router.post('/', requireAuth, (req, res) => {
       privacy_acknowledged ? 1 : 0, safety_agreement_acknowledged ? 1 : 0,
       confidentiality_limits_explained ? 1 : 0,
       staff_member || null, staff_signature || null, signed_date || null,
+      support_needs ? JSON.stringify(support_needs) : null,
+      onward_referrals ? JSON.stringify(onward_referrals) : null,
+      limitations_detail ? JSON.stringify(limitations_detail) : null,
       booking_id
     );
   } else {
@@ -142,8 +153,9 @@ router.post('/', requireAuth, (req, res) => {
         referral_source, referred_by_name, referred_by_role, referred_by_phone, referred_by_email,
         reasons_for_attending,
         privacy_acknowledged, safety_agreement_acknowledged, confidentiality_limits_explained,
-        staff_member, staff_signature, signed_date
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        staff_member, staff_signature, signed_date,
+        support_needs, onward_referrals, limitations_detail
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       booking_id, userId,
       referral_source || null, referred_by_name || null,
@@ -151,12 +163,18 @@ router.post('/', requireAuth, (req, res) => {
       reasons_for_attending ? JSON.stringify(reasons_for_attending) : null,
       privacy_acknowledged ? 1 : 0, safety_agreement_acknowledged ? 1 : 0,
       confidentiality_limits_explained ? 1 : 0,
-      staff_member || null, staff_signature || null, signed_date || null
+      staff_member || null, staff_signature || null, signed_date || null,
+      support_needs ? JSON.stringify(support_needs) : null,
+      onward_referrals ? JSON.stringify(onward_referrals) : null,
+      limitations_detail ? JSON.stringify(limitations_detail) : null
     );
   }
 
   const form = db.prepare('SELECT * FROM intake_forms WHERE booking_id = ?').get(booking_id);
   if (form.reasons_for_attending) form.reasons_for_attending = JSON.parse(form.reasons_for_attending);
+  if (form.support_needs) form.support_needs = JSON.parse(form.support_needs);
+  if (form.onward_referrals) form.onward_referrals = JSON.parse(form.onward_referrals);
+  if (form.limitations_detail) form.limitations_detail = JSON.parse(form.limitations_detail);
   res.status(201).json({ intake: form, service_user_id: userId });
 });
 

@@ -6,6 +6,14 @@
     "start": "node --no-warnings server.js",
     "dev": "nodemon --exec \"node --no-warnings server.js\""
   },
+  "nodemonConfig": {
+    "ignore": [
+      "sessions/",
+      "*.db",
+      "*.db-shm",
+      "*.db-wal"
+    ]
+  },
   "dependencies": {
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",

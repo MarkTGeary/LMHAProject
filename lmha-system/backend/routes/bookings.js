@@ -203,6 +203,23 @@ router.post('/', requireAuth, (req, res) => {
     return res.status(400).json({ error: 'location, date, time_booked, and interaction_type are required' });
   }
 
+  if (location !== req.session.location) {
+    return res.status(403).json({ error: 'Location does not match your current session' });
+  }
+
+  // Validate time format HH:MM
+  if (!/^\d{2}:\d{2}$/.test(time_booked)) {
+    return res.status(400).json({ error: 'Invalid time format' });
+  }
+
+  // Validate type_of_support if provided
+  const VALID_SUPPORT_TYPES = ['SS', 'PS', 'C', 'O', 'SP'];
+  if (type_of_support !== undefined && type_of_support !== null) {
+    if (!Array.isArray(type_of_support) || !type_of_support.every(t => VALID_SUPPORT_TYPES.includes(t))) {
+      return res.status(400).json({ error: 'Invalid type_of_support values' });
+    }
+  }
+
   // Validate location hours
   const timeValid = validateBookingTime(location, date, time_booked);
   if (!timeValid.valid) return res.status(400).json({ error: timeValid.error });

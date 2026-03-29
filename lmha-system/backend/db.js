@@ -95,6 +95,95 @@ function init() {
   console.log('Database initialised at', DB_PATH);
 }
 
+/**
+ * Migrations — run after init() so tables always exist first.
+ * Each migration checks whether it's already been applied before running.
+ */
+function migrate() {
+  // Migration 1: Expand intake_forms with new referral sources + 3 new JSON columns.
+  // Recreates the table to update the referral_source CHECK constraint.
+  const cols = db.prepare("PRAGMA table_info(intake_forms)").all().map(c => c.name);
+  if (!cols.includes('onward_referrals')) {
+    console.log('[DB] Running migration: expanding intake_forms...');
+    db.exec(`
+      CREATE TABLE intake_forms_v2 (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        booking_id INTEGER UNIQUE REFERENCES bookings(id),
+        service_user_id INTEGER REFERENCES service_users(id),
+
+        referral_source TEXT CHECK(referral_source IN (
+          'Self-referral',
+          'Local NGO and Community Partner Agency',
+          'HSE Health Services',
+          'GP',
+          'Community Mental Health Team',
+          'Liaison Psychiatry Team',
+          'Crisis Resolution Team',
+          'CAST',
+          'LSW',
+          'LTSP',
+          'Probation',
+          'Other'
+        )),
+        referred_by_name TEXT,
+        referred_by_role TEXT,
+        referred_by_phone TEXT,
+        referred_by_email TEXT,
+
+        reasons_for_attending TEXT,
+
+        privacy_acknowledged INTEGER DEFAULT 0,
+        safety_agreement_acknowledged INTEGER DEFAULT 0,
+        confidentiality_limits_explained INTEGER DEFAULT 0,
+
+        staff_member TEXT,
+        staff_signature TEXT,
+        signed_date TEXT,
+
+        completed_at TEXT DEFAULT (datetime('now')),
+
+        -- Section 3: granular support needs (JSON array of string keys)
+        support_needs TEXT,
+        -- Section 5: onward referrals made by staff (JSON array of string keys)
+        onward_referrals TEXT,
+        -- Limitations: out-of-hours contact attempts recorded (JSON array of string keys)
+        limitations_detail TEXT
+      )
+    `);
+
+    // Copy existing rows; remap old referral_source values that no longer exist
+    db.exec(`
+      INSERT INTO intake_forms_v2 (
+        id, booking_id, service_user_id,
+        referral_source,
+        referred_by_name, referred_by_role, referred_by_phone, referred_by_email,
+        reasons_for_attending,
+        privacy_acknowledged, safety_agreement_acknowledged, confidentiality_limits_explained,
+        staff_member, staff_signature, signed_date, completed_at,
+        support_needs, onward_referrals, limitations_detail
+      )
+      SELECT
+        id, booking_id, service_user_id,
+        CASE referral_source
+          WHEN 'Primary Care Provider' THEN 'HSE Health Services'
+          WHEN 'NGO Stakeholder'       THEN 'Local NGO and Community Partner Agency'
+          ELSE referral_source
+        END,
+        referred_by_name, referred_by_role, referred_by_phone, referred_by_email,
+        reasons_for_attending,
+        privacy_acknowledged, safety_agreement_acknowledged, confidentiality_limits_explained,
+        staff_member, staff_signature, signed_date, completed_at,
+        NULL, NULL, NULL
+      FROM intake_forms
+    `);
+
+    db.exec('DROP TABLE intake_forms');
+    db.exec('ALTER TABLE intake_forms_v2 RENAME TO intake_forms');
+    console.log('[DB] Migration complete: intake_forms expanded.');
+  }
+}
+
 init();
+migrate();
 
 module.exports = db;

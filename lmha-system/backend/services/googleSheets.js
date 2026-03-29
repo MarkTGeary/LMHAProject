@@ -7,10 +7,53 @@ const SPREADSHEET_IDS = {
   'Solace Café': process.env.SPREADSHEET_ID_SOLACE,
 };
 
-// Row mappings in the Google Sheet (1-indexed as used in Sheets API)
-// These must match your existing spreadsheet structure exactly.
+// ─────────────────────────────────────────────────────────────────
+//  ROW MAP — 1-indexed rows matching the Google Sheet layout.
+//
+//  Counted from the actual sheet structure (Row 1 = "Month" header):
+//
+//  Row 1   Month / Week (column headers)
+//  Row 2   (Week sub-label)
+//  Row 3   blank
+//  Row 4   "1. General Café Service information" | "Sub headings"
+//  Row 5   Demographics / Total no of bookings received
+//  ...
+//  Row 11  Total no of Family/Carer attendees
+//  Row 12  (blank)
+//  Row 13  Total number of attendees Male
+//  ...
+//  Row 23  Age 65+
+//  Row 24  (blank)
+//  Row 25  TOTAL People
+//  Row 26  "2. Support Requirements" header
+//  Row 27  Peer Support & Connection / Information Seeking only
+//  ...
+//  Row 32  TOTAL (Section 2)
+//  Row 33  "3. Support requirements by type" header
+//  Row 34  Needs / Statutory MH info
+//  ...
+//  Row 43  TOTAL (Section 3)
+//  Row 44  "4. Referral Activity" header
+//  Row 45  ED Diversion / Self-referrals
+//  ...
+//  Row 56  TOTAL (Section 4)
+//  Row 57  "5. Advocacy/Follow up" header
+//  Row 58  C&V / Counselling Services
+//  ...
+//  Row 64  (blank)
+//  Row 65  TOTAL C&V
+//  Row 66  Statutory / HSE Mental Health
+//  ...
+//  Row 76  TOTAL Statutory
+//  Row 77  (blank)
+//  Rows 78-83: Miscellaneous/Feedback (not tracked in system)
+//  Row 84  (blank)
+//  Row 85  Limitations / INDV not facilitated
+//  ...
+//  Row 93  Total (Limitations)
+// ─────────────────────────────────────────────────────────────────
 const ROW_MAP = {
-  // Section 1
+  // ── Section 1: General Service Information ──────────────────────
   total_bookings_received:          5,
   total_attendees_through_bookings: 6,
   total_walk_in_crisis:             7,
@@ -18,24 +61,32 @@ const ROW_MAP = {
   total_walk_in_social:             9,
   total_dna:                        10,
   total_carer_attendees:            11,
-  total_male:                       12,
-  total_female:                     13,
-  total_other_gender:               14,
-  total_new:                        15,
-  total_repeat:                     16,
-  age_18_24:                        17,
-  age_25_34:                        18,
-  age_35_44:                        19,
-  age_45_54:                        20,
-  age_55_64:                        21,
-  age_65_plus:                      22,
-  // Section 2
-  information_seeking:              26,
-  social_support_signposting:       27,
-  one_to_one_peer_support:          28,
-  crisis_support:                   29,
-  other_supports:                   30,
-  // Section 3
+  // row 12: blank
+  total_male:                       13,
+  total_female:                     14,
+  total_other_gender:               15,
+  total_new:                        16,
+  total_repeat:                     17,
+  age_18_24:                        18,
+  age_25_34:                        19,
+  age_35_44:                        20,
+  age_45_54:                        21,
+  age_55_64:                        22,
+  age_65_plus:                      23,
+  // row 24: blank
+  total_people:                     25,
+
+  // row 26: "2. Support Requirements" header
+  // ── Section 2: Support Requirements ─────────────────────────────
+  information_seeking:              27,
+  social_support_signposting:       28,
+  one_to_one_peer_support:          29,
+  crisis_support:                   30,
+  other_supports:                   31,
+  s2_total:                         32,
+
+  // row 33: "3. Support requirements by type" header
+  // ── Section 3: Support Requirements by Type ──────────────────────
   info_statutory_mh_hse:            34,
   info_non_statutory_mh:            35,
   info_wider_community:             36,
@@ -45,13 +96,62 @@ const ROW_MAP = {
   crisis_onward_ae:                 40,
   crisis_guards_community:          41,
   social_support:                   42,
-  // Section 4
-  self_referral:                    46,
-  community_ngo:                    47,
-  hse_mh_services:                  48,
-  hse_health_services:              49,
-  gp:                               50,
-  other_referral:                   51,
+  s3_total:                         43,
+
+  // row 44: "4. Referral Activity" header
+  // ── Section 4: Referral Activity ─────────────────────────────────
+  self_referral:                    45,
+  community_ngo:                    46,
+  hse_mh_services:                  47,
+  hse_health_services:              48,
+  gp:                               49,
+  other_referral:                   50,
+  cast_referral:                    51,
+  lsw_referral:                     52,
+  ltsp_referral:                    53,
+  probation_referral:               54,
+  ed_diversion_yes:                 55,
+  s4_total:                         56,
+
+  // row 57: "5. Advocacy/Follow up" header
+  // ── Section 5 C&V ────────────────────────────────────────────────
+  cv_counselling:                   58,
+  cv_housing:                       59,
+  cv_finance:                       60,
+  cv_mh_groups:                     61,
+  cv_addiction_groups:              62,
+  cv_family:                        63,
+  // row 64: blank
+  s5_cv_total:                      65,
+
+  // ── Section 5 Statutory ───────────────────────────────────────────
+  statutory_hse_mh:                 66,
+  statutory_hse_primary_care:       67,
+  statutory_hse_disability:         68,
+  statutory_hse_older_persons:      69,
+  statutory_hse_crt:                70,
+  statutory_tusla:                  71,
+  statutory_mabs:                   72,
+  statutory_dept_social:            73,
+  statutory_citizens_info:          74,
+  statutory_ags:                    75,
+  s5_statutory_total:               76,
+
+  // rows 77-84: blank + Miscellaneous/Feedback (not tracked in system)
+
+  // ── Limitations (positional — same rows for both locations) ───────
+  // lim_day1/2/3  = Mon/Tue/Wed for Solace Café, Sat/Sun/(none) for LMHA
+  // lim_time_early = before 6pm for Solace, before 11am for LMHA
+  // lim_time_late  = after midnight for Solace, after 5pm for LMHA
+  lim_indv_not_facilitated:         85,
+  lim_day1:                         86,
+  lim_day2:                         87,
+  lim_day3:                         88,
+  lim_time_early:                   89,
+  lim_time_late:                    90,
+  lim_calls_out_hours:              91,
+  lim_text_out_hours:               92,
+  lim_total:                        93,
 };
 
 async function getAuthClient() {
@@ -68,7 +168,6 @@ async function getAuthClient() {
  * Returns the A1 column letter (e.g. 'C', 'D', ...).
  */
 async function findWeekColumn(sheets, spreadsheetId, startDate, endDate) {
-  // Read row 1 (header row) to find the week label
   const response = await sheets.spreadsheets.values.get({
     spreadsheetId,
     range: '1:1',
@@ -77,19 +176,18 @@ async function findWeekColumn(sheets, spreadsheetId, startDate, endDate) {
   const headers = response.data.values ? response.data.values[0] : [];
   const weekLabel = `${startDate} to ${endDate}`;
 
-  // Try exact match first
   let colIndex = headers.findIndex(h => h && h.toString().includes(startDate));
   if (colIndex === -1) {
-    // Try partial match
     colIndex = headers.findIndex(h => h && h.toString().includes(weekLabel));
   }
 
   if (colIndex === -1) {
-    throw new Error(`Could not find week column for ${weekLabel} in spreadsheet header row. ` +
-      `Headers found: ${headers.slice(0, 10).join(', ')}`);
+    throw new Error(
+      `Could not find week column for ${weekLabel} in spreadsheet header row. ` +
+      `Headers found: ${headers.slice(0, 10).join(', ')}`
+    );
   }
 
-  // Convert 0-indexed to A1 column letter
   return columnToLetter(colIndex + 1);
 }
 
@@ -105,7 +203,7 @@ function columnToLetter(col) {
 
 /**
  * Write metrics to the appropriate Google Sheet.
- * Never deletes or overwrites — only writes to the found week column.
+ * Never deletes or clears — only writes to the found week column.
  */
 async function writeMetrics(location, metrics, startDate, endDate) {
   const spreadsheetId = SPREADSHEET_IDS[location];
@@ -119,20 +217,29 @@ async function writeMetrics(location, metrics, startDate, endDate) {
   const colLetter = await findWeekColumn(sheets, spreadsheetId, startDate, endDate);
   console.log(`[Sheets] Writing to column ${colLetter} for ${location} week ${startDate}–${endDate}`);
 
-  // Flatten all sections
-  const allMetrics = {
+  // Flatten all sections including totals
+  const flat = {
     ...metrics.section1,
     ...metrics.section2,
+    s2_total: metrics.section2.total,
     ...metrics.section3,
+    s3_total: metrics.section3.total,
     ...metrics.section4,
+    s4_total: metrics.section4.total,
+    ...metrics.section5_cv,
+    s5_cv_total: metrics.section5_cv.total,
+    ...metrics.section5_statutory,
+    s5_statutory_total: metrics.section5_statutory.total,
+    ...metrics.limitations,
+    lim_total: metrics.limitations.total,
   };
 
   const data = [];
   for (const [key, row] of Object.entries(ROW_MAP)) {
-    if (allMetrics[key] !== undefined) {
+    if (flat[key] !== undefined) {
       data.push({
         range: `${colLetter}${row}`,
-        values: [[allMetrics[key]]],
+        values: [[flat[key]]],
       });
     }
   }

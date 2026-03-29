@@ -10,13 +10,16 @@ router.get('/preview', requireAuth, (req, res) => {
   if (!location || !start || !end) {
     return res.status(400).json({ error: 'location, start, and end are required' });
   }
+  if (location !== req.session.location) {
+    return res.status(403).json({ error: 'Location does not match your current session' });
+  }
 
   try {
     const metrics = aggregateMetrics(location, start, end);
     res.json(metrics);
   } catch (err) {
     console.error('[Metrics] Aggregation error:', err);
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: 'Metrics calculation failed' });
   }
 });
 
@@ -26,6 +29,9 @@ router.post('/submit', requireAuth, async (req, res) => {
   if (!location || !start || !end) {
     return res.status(400).json({ error: 'location, start, and end are required' });
   }
+  if (location !== req.session.location) {
+    return res.status(403).json({ error: 'Location does not match your current session' });
+  }
 
   try {
     const metrics = aggregateMetrics(location, start, end);
@@ -33,7 +39,7 @@ router.post('/submit', requireAuth, async (req, res) => {
     res.json({ ok: true, result, metrics });
   } catch (err) {
     console.error('[Metrics] Submit error:', err);
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: 'Metrics submission failed' });
   }
 });
 

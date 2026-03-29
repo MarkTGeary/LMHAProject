@@ -1,10 +1,15 @@
 export default function MetricsPreview({ metrics }) {
   if (!metrics) return null
-  const { section1: s1, section2: s2, section3: s3, section4: s4, dateRange, location } = metrics
+  const {
+    section1: s1, section2: s2, section3: s3, section4: s4,
+    section5_cv: s5cv, section5_statutory: s5stat,
+    limitations: lim,
+    dateRange, location,
+  } = metrics
 
-  const Row = ({ label, value }) => (
-    <div className="flex justify-between items-center py-2 border-b border-gray-100 last:border-0">
-      <span className="text-sm text-gray-700">{label}</span>
+  const Row = ({ label, value, total }) => (
+    <div className={`flex justify-between items-center py-2 border-b border-gray-100 last:border-0 ${total ? 'font-bold bg-gray-50 rounded px-2' : ''}`}>
+      <span className={`text-sm ${total ? 'text-gray-800' : 'text-gray-700'}`}>{label}</span>
       <span className="font-bold text-gray-900 text-lg min-w-[40px] text-right">{value ?? 0}</span>
     </div>
   )
@@ -36,7 +41,7 @@ export default function MetricsPreview({ metrics }) {
         <Row label="Family/Carer attendees" value={s1?.total_carer_attendees} />
         <Row label="Male" value={s1?.total_male} />
         <Row label="Female" value={s1?.total_female} />
-        <Row label="Other/Prefer not to say" value={s1?.total_other_gender} />
+        <Row label="Other / Prefer not to say" value={s1?.total_other_gender} />
         <Row label="New attendees" value={s1?.total_new} />
         <Row label="Repeat attendees" value={s1?.total_repeat} />
         <Row label="Age 18–24" value={s1?.age_18_24} />
@@ -45,6 +50,7 @@ export default function MetricsPreview({ metrics }) {
         <Row label="Age 45–54" value={s1?.age_45_54} />
         <Row label="Age 55–64" value={s1?.age_55_64} />
         <Row label="Age 65+" value={s1?.age_65_plus} />
+        <Row label="TOTAL People" value={s1?.total_people} total />
       </Section>
 
       <Section title="Section 2 — Support Requirements">
@@ -53,6 +59,7 @@ export default function MetricsPreview({ metrics }) {
         <Row label="One-to-one peer support" value={s2?.one_to_one_peer_support} />
         <Row label="Crisis support" value={s2?.crisis_support} />
         <Row label="Other supports (phone, email, text, etc.)" value={s2?.other_supports} />
+        <Row label="TOTAL" value={s2?.total} total />
       </Section>
 
       <Section title="Section 3 — Support Requirements by Type">
@@ -63,8 +70,9 @@ export default function MetricsPreview({ metrics }) {
         <Row label="Peer support — support recovery" value={s3?.peer_support_recovery} />
         <Row label="Crisis — de-escalation" value={s3?.crisis_deescalation} />
         <Row label="Crisis — onward referral to A&E" value={s3?.crisis_onward_ae} />
-        <Row label="Crisis — guards / community support" value={s3?.crisis_guards_community} />
+        <Row label="Crisis — Gardaí / community support" value={s3?.crisis_guards_community} />
         <Row label="Social support" value={s3?.social_support} />
+        <Row label="TOTAL" value={s3?.total} total />
       </Section>
 
       <Section title="Section 4 — Referral Activity">
@@ -74,6 +82,59 @@ export default function MetricsPreview({ metrics }) {
         <Row label="HSE Health Services (Disability, Older Persons, Primary Care)" value={s4?.hse_health_services} />
         <Row label="GP" value={s4?.gp} />
         <Row label="Other" value={s4?.other_referral} />
+        <Row label="CAST" value={s4?.cast_referral} />
+        <Row label="LSW" value={s4?.lsw_referral} />
+        <Row label="LTSP" value={s4?.ltsp_referral} />
+        <Row label="Probation" value={s4?.probation_referral} />
+        <Row label="Would have attended A&E if service not available" value={s4?.ed_diversion_yes} />
+        <Row label="TOTAL" value={s4?.total} total />
+      </Section>
+
+      <Section title="Section 5 — Advocacy / Follow-up: Community & Voluntary">
+        <Row label="C&V Counselling Services (MyMind, Turn2Me etc)" value={s5cv?.cv_counselling} />
+        <Row label="C&V Housing Support Services" value={s5cv?.cv_housing} />
+        <Row label="C&V Finance Support Services" value={s5cv?.cv_finance} />
+        <Row label="C&V MH Support Groups (GROW, Aware, Shine, Adapt etc)" value={s5cv?.cv_mh_groups} />
+        <Row label="C&V Addiction/Substance Misuse Groups (AlAnon, AA etc)" value={s5cv?.cv_addiction_groups} />
+        <Row label="C&V Family Support Services" value={s5cv?.cv_family} />
+        <Row label="TOTAL" value={s5cv?.total} total />
+      </Section>
+
+      <Section title="Section 5 — Advocacy / Follow-up: Statutory Services">
+        <Row label="HSE Mental Health Services" value={s5stat?.statutory_hse_mh} />
+        <Row label="HSE Primary Care Services" value={s5stat?.statutory_hse_primary_care} />
+        <Row label="HSE Disability Services" value={s5stat?.statutory_hse_disability} />
+        <Row label="HSE Older Persons" value={s5stat?.statutory_hse_older_persons} />
+        <Row label="HSE CRT" value={s5stat?.statutory_hse_crt} />
+        <Row label="Tusla" value={s5stat?.statutory_tusla} />
+        <Row label="MABS" value={s5stat?.statutory_mabs} />
+        <Row label="Dept of Social Protection" value={s5stat?.statutory_dept_social} />
+        <Row label="Citizens Information" value={s5stat?.statutory_citizens_info} />
+        <Row label="AGS (Gardaí)" value={s5stat?.statutory_ags} />
+        <Row label="TOTAL" value={s5stat?.total} total />
+      </Section>
+
+      <Section title="Limitations — Out-of-Hours Contact">
+        <Row label="Individuals who could not be facilitated" value={lim?.lim_indv_not_facilitated} />
+        {location === 'LMHA' ? (
+          <>
+            <Row label="Looked for appointment on Saturday" value={lim?.lim_day1} />
+            <Row label="Looked for appointment on Sunday" value={lim?.lim_day2} />
+            <Row label="Looked for appointment before 11am" value={lim?.lim_time_early} />
+            <Row label="Looked for appointment after 5pm" value={lim?.lim_time_late} />
+          </>
+        ) : (
+          <>
+            <Row label="Looked for appointment on Monday" value={lim?.lim_day1} />
+            <Row label="Looked for appointment on Tuesday" value={lim?.lim_day2} />
+            <Row label="Looked for appointment on Wednesday" value={lim?.lim_day3} />
+            <Row label="Looked for appointment before 6pm" value={lim?.lim_time_early} />
+            <Row label="Looked for appointment after midnight" value={lim?.lim_time_late} />
+          </>
+        )}
+        <Row label="Calls out of hours" value={lim?.lim_calls_out_hours} />
+        <Row label="Text out of hours" value={lim?.lim_text_out_hours} />
+        <Row label="TOTAL" value={lim?.total} total />
       </Section>
     </div>
   )

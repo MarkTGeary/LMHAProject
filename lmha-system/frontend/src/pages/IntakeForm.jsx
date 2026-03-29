@@ -7,11 +7,15 @@ import RepeatUserSearch from '../components/RepeatUserSearch'
 const REFERRAL_SOURCES = [
   'Self-referral',
   'Local NGO and Community Partner Agency',
-  'Primary Care Provider',
-  'NGO Stakeholder',
+  'HSE Health Services',
+  'GP',
   'Community Mental Health Team',
   'Liaison Psychiatry Team',
   'Crisis Resolution Team',
+  'CAST',
+  'LSW',
+  'LTSP',
+  'Probation',
   'Other',
 ]
 
@@ -23,6 +27,62 @@ const REASONS = [
   'Looking for Social Support',
   'Other',
   'Prefer not to say',
+]
+
+const SUPPORT_NEEDS_OPTIONS = [
+  { key: 'info_statutory_mh',    label: 'Information on statutory MH services (HSE Mental Health Services)' },
+  { key: 'info_non_statutory_mh', label: 'Information on non-statutory MH supports (counselling, group supports etc)' },
+  { key: 'info_wider_community', label: 'Information on wider community supports (MABS, Family Resource etc)' },
+  { key: 'peer_coping',          label: 'Peer support to enhance coping skills' },
+  { key: 'peer_recovery',        label: 'Peer support to support recovery' },
+  { key: 'crisis_deescalation',  label: 'Crisis support — de-escalation' },
+  { key: 'crisis_ae',            label: 'Crisis support — onward referral to A&E' },
+  { key: 'crisis_guards',        label: 'Crisis support — Gardaí or other community support' },
+  { key: 'social',               label: 'Social support' },
+]
+
+const ONWARD_REFERRAL_OPTIONS = [
+  { group: 'Community & Voluntary Services', items: [
+    { key: 'cv_counselling',      label: 'C&V Counselling Services (MyMind, Turn2Me etc)' },
+    { key: 'cv_housing',          label: 'C&V Housing Support Services (Focus Ireland, Simon etc)' },
+    { key: 'cv_finance',          label: 'C&V Finance Support Services' },
+    { key: 'cv_mh_groups',        label: 'C&V MH Support Groups (GROW, Aware, Shine, Adapt etc)' },
+    { key: 'cv_addiction_groups', label: 'C&V Addiction/Substance Misuse Groups (AlAnon, AA etc)' },
+    { key: 'cv_family',           label: 'C&V Family Support Services (One Family, Family Resource Centres etc)' },
+  ]},
+  { group: 'Statutory Services', items: [
+    { key: 'hse_mh',               label: 'HSE Mental Health Services' },
+    { key: 'hse_primary_care',     label: 'HSE Primary Care Services' },
+    { key: 'hse_disability',       label: 'HSE Disability Services' },
+    { key: 'hse_older_persons',    label: 'HSE Older Persons' },
+    { key: 'hse_crt',              label: 'HSE CRT' },
+    { key: 'tusla',                label: 'Tusla' },
+    { key: 'mabs',                 label: 'MABS' },
+    { key: 'dept_social_protection', label: 'Dept of Social Protection' },
+    { key: 'citizens_information', label: 'Citizens Information' },
+    { key: 'ags',                  label: 'AGS (Gardaí)' },
+  ]},
+]
+
+// Solace Café: Thu–Sun 18:00–00:00 — closed Mon/Tue/Wed, before 6pm, after midnight
+const LIMITATIONS_SOLACE = [
+  { key: 'monday',             label: 'Looked for appointment on Monday' },
+  { key: 'tuesday',            label: 'Looked for appointment on Tuesday' },
+  { key: 'wednesday',          label: 'Looked for appointment on Wednesday' },
+  { key: 'before_6pm',         label: 'Looked for appointment before 6pm' },
+  { key: 'after_midnight',     label: 'Looked for appointment after midnight' },
+  { key: 'calls_out_of_hours', label: 'Calls out of hours' },
+  { key: 'text_out_of_hours',  label: 'Text out of hours' },
+]
+
+// LMHA: Mon–Fri 11:00–17:00 — closed weekends, before 11am, after 5pm
+const LIMITATIONS_LMHA = [
+  { key: 'saturday',           label: 'Looked for appointment on Saturday' },
+  { key: 'sunday',             label: 'Looked for appointment on Sunday' },
+  { key: 'before_11am',        label: 'Looked for appointment before 11am' },
+  { key: 'after_5pm',          label: 'Looked for appointment after 5pm' },
+  { key: 'calls_out_of_hours', label: 'Calls out of hours' },
+  { key: 'text_out_of_hours',  label: 'Text out of hours' },
 ]
 
 const AGE_GROUPS = ['18-24', '25-34', '35-44', '45-54', '55-64', '65+']
@@ -84,6 +144,40 @@ function CheckGroup({ label, options, values, onChange }) {
   )
 }
 
+// Checkbox group for { key, label } option objects — stores keys, displays labels
+function KeyCheckGroup({ label, options, values, onChange }) {
+  const toggle = (key) => {
+    const arr = values || []
+    onChange(arr.includes(key) ? arr.filter(k => k !== key) : [...arr, key])
+  }
+  return (
+    <div className="field">
+      {label && <label className="label">{label}</label>}
+      <div className="space-y-2">
+        {options.map(({ key, label: optLabel }) => (
+          <button
+            key={key}
+            type="button"
+            onClick={() => toggle(key)}
+            className={`w-full min-h-[48px] text-left px-4 rounded-xl border-2 font-semibold text-sm transition-all flex items-center gap-3 ${
+              (values || []).includes(key)
+                ? 'bg-blue-50 border-blue-500 text-blue-800'
+                : 'bg-white border-gray-200 text-gray-700 hover:border-gray-300'
+            }`}
+          >
+            <span className={`w-6 h-6 rounded border-2 flex items-center justify-center shrink-0 ${
+              (values || []).includes(key) ? 'bg-blue-600 border-blue-600 text-white' : 'border-gray-400'
+            }`}>
+              {(values || []).includes(key) && '✓'}
+            </span>
+            {optLabel}
+          </button>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 export default function IntakeForm() {
   const { id: bookingId } = useParams()
   const { user } = useAuth()
@@ -120,6 +214,10 @@ export default function IntakeForm() {
     confidentiality_limits_explained: false,
     staff_member: user?.name || '',
     signed_date: new Date().toISOString().slice(0, 10),
+    // Optional — can be left blank
+    support_needs: [],
+    onward_referrals: [],
+    limitations_detail: [],
   })
 
   useEffect(() => {
@@ -145,6 +243,9 @@ export default function IntakeForm() {
           confidentiality_limits_explained: !!intake.confidentiality_limits_explained,
           staff_member: intake.staff_member || user?.name || '',
           signed_date: intake.signed_date || new Date().toISOString().slice(0, 10),
+          support_needs: intake.support_needs || [],
+          onward_referrals: intake.onward_referrals || [],
+          limitations_detail: intake.limitations_detail || [],
         })
       }
     }).finally(() => setLoading(false))
@@ -464,6 +565,46 @@ export default function IntakeForm() {
               options={REASONS}
               values={p2.reasons_for_attending}
               onChange={vals => setP2Field('reasons_for_attending', vals)}
+            />
+          </div>
+
+          {/* ── Optional: Support Needs (Section 3) ── */}
+          <div className="card border-2 border-gray-200">
+            <h2 className="text-lg font-bold mb-1 text-gray-700">Support Needs Assessment <span className="text-sm font-normal text-gray-400">(Optional)</span></h2>
+            <p className="text-sm text-gray-500 mb-4">Tick all that apply. Can be completed now or updated later.</p>
+            <KeyCheckGroup
+              label="What support did this person need?"
+              options={SUPPORT_NEEDS_OPTIONS}
+              values={p2.support_needs}
+              onChange={vals => setP2Field('support_needs', vals)}
+            />
+          </div>
+
+          {/* ── Optional: Onward Referrals (Section 5) ── */}
+          <div className="card border-2 border-gray-200">
+            <h2 className="text-lg font-bold mb-1 text-gray-700">Onward Referrals <span className="text-sm font-normal text-gray-400">(Optional)</span></h2>
+            <p className="text-sm text-gray-500 mb-4">Where was this person referred to? Can be completed now or updated later.</p>
+            {ONWARD_REFERRAL_OPTIONS.map(({ group, items }) => (
+              <div key={group} className="mb-4">
+                <div className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">{group}</div>
+                <KeyCheckGroup
+                  options={items}
+                  values={p2.onward_referrals}
+                  onChange={vals => setP2Field('onward_referrals', vals)}
+                />
+              </div>
+            ))}
+          </div>
+
+          {/* ── Optional: Limitations ── */}
+          <div className="card border-2 border-gray-200">
+            <h2 className="text-lg font-bold mb-1 text-gray-700">Limitations <span className="text-sm font-normal text-gray-400">(Optional)</span></h2>
+            <p className="text-sm text-gray-500 mb-4">Did this person previously try to contact the service at a time we couldn't facilitate them?</p>
+            <KeyCheckGroup
+              label="Previous out-of-hours contact attempts"
+              options={booking?.location === 'LMHA' ? LIMITATIONS_LMHA : LIMITATIONS_SOLACE}
+              values={p2.limitations_detail}
+              onChange={vals => setP2Field('limitations_detail', vals)}
             />
           </div>
 
