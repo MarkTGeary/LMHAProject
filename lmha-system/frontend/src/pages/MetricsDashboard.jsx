@@ -20,6 +20,7 @@ export default function MetricsDashboard() {
   const [end, setEnd] = useState(thisSun.toISOString().slice(0, 10))
   const [metrics, setMetrics] = useState(null)
   const [loading, setLoading] = useState(false)
+  const [loadingSheets, setLoadingSheets] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
   const [submitResult, setSubmitResult] = useState(null)
@@ -53,6 +54,24 @@ export default function MetricsDashboard() {
       setTimeout(() => setFeedbackSaved(false), 2500)
     } catch { /* non-critical */ }
     setFeedbackSaving(false)
+  }
+
+  const loadFromSheets = async () => {
+    setError(''); setMetrics(null); setSubmitResult(null); setLoadingSheets(true)
+    try {
+      const res = await fetch(
+        `/api/metrics/read?location=${encodeURIComponent(location)}&start=${start}&end=${end}`,
+        { credentials: 'include' }
+      )
+      const data = await res.json()
+      if (!res.ok) { setError(data.error); setLoadingSheets(false); return }
+      setMetrics(data)
+      // Populate feedback inputs from what was in the sheet
+      if (data.feedback) setFeedback(data.feedback)
+    } catch {
+      setError('Failed to read from Google Sheets')
+    }
+    setLoadingSheets(false)
   }
 
   const preview = async () => {
@@ -166,9 +185,14 @@ export default function MetricsDashboard() {
           </div>
         </div>
 
-        <button onClick={preview} disabled={loading} className="btn-primary btn-lg w-full">
-          {loading ? 'Loading...' : 'Preview Metrics'}
-        </button>
+        <div className="flex gap-3">
+          <button onClick={preview} disabled={loading || loadingSheets} className="btn-primary btn-lg flex-1">
+            {loading ? 'Loading...' : 'Preview Metrics'}
+          </button>
+          <button onClick={loadFromSheets} disabled={loading || loadingSheets} className="btn-secondary btn-lg flex-1">
+            {loadingSheets ? 'Reading...' : '📋 Load from Sheets'}
+          </button>
+        </div>
 
         {error && (
           <div className="bg-red-50 border-2 border-red-300 rounded-xl p-4 text-red-700 font-semibold">
@@ -187,9 +211,17 @@ export default function MetricsDashboard() {
           <>
             <div className="card">
               <div className="flex items-center justify-between mb-4">
-                <h2 className="text-xl font-bold">
-                  Metrics Preview — {location}
-                </h2>
+                <div>
+                  <h2 className="text-xl font-bold">Metrics Preview — {location}</h2>
+                  {metrics?._source === 'sheets'
+                    ? <span className="text-xs font-semibold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">
+                        Read from Google Sheets · column {metrics._column}
+                      </span>
+                    : <span className="text-xs font-semibold text-green-700 bg-green-50 px-2 py-0.5 rounded-full">
+                        Calculated from local database
+                      </span>
+                  }
+                </div>
                 <span className="text-sm text-gray-500">{start} → {end}</span>
               </div>
               <MetricsPreview metrics={{ ...metrics, feedback }} />
@@ -202,18 +234,22 @@ export default function MetricsDashboard() {
               >
                 🖨️ Print Report
               </button>
-              <button
-                onClick={submit}
-                disabled={submitting}
-                className="btn-success btn-lg flex-1"
-              >
-                {submitting ? 'Pushing...' : '📊 Push to Google Sheets'}
-              </button>
+              {metrics?._source !== 'sheets' && (
+                <button
+                  onClick={submit}
+                  disabled={submitting}
+                  className="btn-success btn-lg flex-1"
+                >
+                  {submitting ? 'Pushing...' : '📊 Push to Google Sheets'}
+                </button>
+              )}
             </div>
 
-            <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-amber-800 text-sm no-print">
-              <strong>Note:</strong> This will write to the {location} spreadsheet. Existing cells are never deleted. Make sure the correct week column exists in the spreadsheet.
-            </div>
+            {metrics?._source !== 'sheets' && (
+              <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-amber-800 text-sm no-print">
+                <strong>Note:</strong> This will write to the {location} spreadsheet. Existing cells are never deleted. Make sure the correct week column exists in the spreadsheet.
+              </div>
+            )}
           </>
         )}
       </div>

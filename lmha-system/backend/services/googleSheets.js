@@ -312,4 +312,154 @@ async function writeMetrics(location, metrics, startDate, endDate) {
   };
 }
 
-module.exports = { writeMetrics };
+/**
+ * Read metrics back from the Google Sheet for a given week.
+ * Returns an object shaped like aggregateMetrics() output so MetricsPreview
+ * can render it identically.
+ */
+async function readMetrics(location, startDate, endDate) {
+  const spreadsheetId = SPREADSHEET_IDS[location];
+  if (!spreadsheetId) {
+    throw new Error(`No spreadsheet ID configured for location: ${location}`);
+  }
+
+  const sheets = google.sheets({ version: 'v4', auth: getAuth() });
+  const colLetter = await findWeekColumn(sheets, spreadsheetId, startDate, endDate);
+  console.log(`[Sheets] Reading from column ${colLetter} for ${location} week ${startDate}–${endDate}`);
+
+  // Build a list of ranges — one per ROW_MAP entry
+  const keys = Object.keys(ROW_MAP);
+  const ranges = keys.map(k => `${colLetter}${ROW_MAP[k]}`);
+
+  const response = await sheets.spreadsheets.values.batchGet({
+    spreadsheetId,
+    ranges,
+    valueRenderOption: 'UNFORMATTED_VALUE',
+  });
+
+  // Map results back to { key: value }
+  const flat = {};
+  (response.data.valueRanges || []).forEach((vr, i) => {
+    flat[keys[i]] = Number((vr.values || [[0]])[0][0]) || 0;
+  });
+
+  // Reconstruct the nested section structure
+  const s1 = {
+    total_bookings_received:          flat.total_bookings_received,
+    total_attendees_through_bookings: flat.total_attendees_through_bookings,
+    total_walk_in_crisis:             flat.total_walk_in_crisis,
+    total_support_calls:              flat.total_support_calls,
+    total_walk_in_social:             flat.total_walk_in_social,
+    total_dna:                        flat.total_dna,
+    total_carer_attendees:            flat.total_carer_attendees,
+    total_male:                       flat.total_male,
+    total_female:                     flat.total_female,
+    total_other_gender:               flat.total_other_gender,
+    total_new:                        flat.total_new,
+    total_repeat:                     flat.total_repeat,
+    age_18_24:                        flat.age_18_24,
+    age_25_34:                        flat.age_25_34,
+    age_35_44:                        flat.age_35_44,
+    age_45_54:                        flat.age_45_54,
+    age_55_64:                        flat.age_55_64,
+    age_65_plus:                      flat.age_65_plus,
+    total_people:                     flat.total_people,
+  };
+
+  const s2 = {
+    information_seeking:        flat.information_seeking,
+    social_support_signposting: flat.social_support_signposting,
+    one_to_one_peer_support:    flat.one_to_one_peer_support,
+    crisis_support:             flat.crisis_support,
+    other_supports:             flat.other_supports,
+    total:                      flat.s2_total,
+  };
+
+  const s3 = {
+    info_statutory_mh_hse:   flat.info_statutory_mh_hse,
+    info_non_statutory_mh:   flat.info_non_statutory_mh,
+    info_wider_community:    flat.info_wider_community,
+    peer_support_coping:     flat.peer_support_coping,
+    peer_support_recovery:   flat.peer_support_recovery,
+    crisis_deescalation:     flat.crisis_deescalation,
+    crisis_onward_ae:        flat.crisis_onward_ae,
+    crisis_guards_community: flat.crisis_guards_community,
+    social_support:          flat.social_support,
+    total:                   flat.s3_total,
+  };
+
+  const s4 = {
+    self_referral:       flat.self_referral,
+    community_ngo:       flat.community_ngo,
+    hse_mh_services:     flat.hse_mh_services,
+    hse_health_services: flat.hse_health_services,
+    gp:                  flat.gp,
+    other_referral:      flat.other_referral,
+    cast_referral:       flat.cast_referral,
+    lsw_referral:        flat.lsw_referral,
+    ltsp_referral:       flat.ltsp_referral,
+    probation_referral:  flat.probation_referral,
+    ed_diversion_yes:    flat.ed_diversion_yes,
+    total:               flat.s4_total,
+  };
+
+  const s5cv = {
+    cv_counselling:      flat.cv_counselling,
+    cv_housing:          flat.cv_housing,
+    cv_finance:          flat.cv_finance,
+    cv_mh_groups:        flat.cv_mh_groups,
+    cv_addiction_groups: flat.cv_addiction_groups,
+    cv_family:           flat.cv_family,
+    total:               flat.s5_cv_total,
+  };
+
+  const s5stat = {
+    statutory_hse_mh:            flat.statutory_hse_mh,
+    statutory_hse_primary_care:  flat.statutory_hse_primary_care,
+    statutory_hse_disability:    flat.statutory_hse_disability,
+    statutory_hse_older_persons: flat.statutory_hse_older_persons,
+    statutory_hse_crt:           flat.statutory_hse_crt,
+    statutory_tusla:             flat.statutory_tusla,
+    statutory_mabs:              flat.statutory_mabs,
+    statutory_dept_social:       flat.statutory_dept_social,
+    statutory_citizens_info:     flat.statutory_citizens_info,
+    statutory_ags:               flat.statutory_ags,
+    total:                       flat.s5_statutory_total,
+  };
+
+  const feedback = {
+    thankyou_letters: flat.misc_thankyou_letters,
+    verbal_feedback:  flat.misc_verbal_feedback,
+    testimonials:     flat.misc_testimonials,
+    vox_pop:          flat.misc_vox_pop,
+  };
+
+  const limitations = {
+    lim_indv_not_facilitated: flat.lim_indv_not_facilitated,
+    lim_day1:                 flat.lim_day1,
+    lim_day2:                 flat.lim_day2,
+    lim_day3:                 flat.lim_day3,
+    lim_time_early:           flat.lim_time_early,
+    lim_time_late:            flat.lim_time_late,
+    lim_calls_out_hours:      flat.lim_calls_out_hours,
+    lim_text_out_hours:       flat.lim_text_out_hours,
+    total:                    flat.lim_total,
+  };
+
+  return {
+    section1:          s1,
+    section2:          s2,
+    section3:          s3,
+    section4:          s4,
+    section5_cv:       s5cv,
+    section5_statutory: s5stat,
+    feedback,
+    limitations,
+    dateRange: { startDate, endDate },
+    location,
+    _source: 'sheets',
+    _column: colLetter,
+  };
+}
+
+module.exports = { writeMetrics, readMetrics };

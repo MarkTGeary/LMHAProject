@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { requireAuth } = require('../middleware/requireAuth');
 const { aggregateMetrics } = require('../services/metricsAggregator');
-const { writeMetrics } = require('../services/googleSheets');
+const { writeMetrics, readMetrics } = require('../services/googleSheets');
 const db = require('../db');
 
 // GET /api/metrics/preview?location=&start=&end=
@@ -47,6 +47,25 @@ router.post('/submit', requireAuth, async (req, res) => {
   } catch (err) {
     console.error('[Metrics] Submit error:', err);
     res.status(500).json({ error: err.message || 'Metrics submission failed' });
+  }
+});
+
+// GET /api/metrics/read?location=&start=&end=
+// Reads previously pushed data back from Google Sheets for a past week.
+router.get('/read', requireAuth, async (req, res) => {
+  const { location, start, end } = req.query;
+  if (!location || !start || !end) {
+    return res.status(400).json({ error: 'location, start, and end are required' });
+  }
+  if (location !== req.session.location) {
+    return res.status(403).json({ error: 'Location does not match your current session' });
+  }
+  try {
+    const metrics = await readMetrics(location, start, end);
+    res.json(metrics);
+  } catch (err) {
+    console.error('[Metrics] Read error:', err);
+    res.status(500).json({ error: err.message || 'Failed to read metrics from Google Sheets' });
   }
 });
 
