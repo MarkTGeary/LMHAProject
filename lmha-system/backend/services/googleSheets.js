@@ -137,7 +137,15 @@ const ROW_MAP = {
   statutory_ags:                    75,
   s5_statutory_total:               76,
 
-  // rows 77-84: blank + Miscellaneous/Feedback (not tracked in system)
+  // row 77: blank
+  // row 78: "Miscellaneous / Feedback from service users" header (no data written)
+  // ── Miscellaneous: Feedback from Service Users ────────────────────
+  misc_thankyou_letters:            79,
+  misc_verbal_feedback:             80,
+  misc_testimonials:                81,
+  misc_vox_pop:                     82,
+  misc_total:                       83,
+  // row 84: blank
 
   // ── Limitations (positional — same rows for both locations) ───────
   // lim_day1/2/3  = Mon/Tue/Wed for Solace Café, Sat/Sun/(none) for LMHA
@@ -253,6 +261,9 @@ async function writeMetrics(location, metrics, startDate, endDate) {
   console.log(`[Sheets] Writing to column ${colLetter} for ${location} week ${startDate}–${endDate}`);
 
   // Flatten all sections including totals
+  const fb = metrics.feedback || {};
+  const miscTotal = (fb.thankyou_letters || 0) + (fb.verbal_feedback || 0) +
+                    (fb.testimonials || 0) + (fb.vox_pop || 0);
   const flat = {
     ...metrics.section1,
     ...metrics.section2,
@@ -265,6 +276,11 @@ async function writeMetrics(location, metrics, startDate, endDate) {
     s5_cv_total: metrics.section5_cv.total,
     ...metrics.section5_statutory,
     s5_statutory_total: metrics.section5_statutory.total,
+    misc_thankyou_letters: fb.thankyou_letters || 0,
+    misc_verbal_feedback:  fb.verbal_feedback  || 0,
+    misc_testimonials:     fb.testimonials     || 0,
+    misc_vox_pop:          fb.vox_pop          || 0,
+    misc_total:            miscTotal,
     ...metrics.limitations,
     lim_total: metrics.limitations.total,
   };

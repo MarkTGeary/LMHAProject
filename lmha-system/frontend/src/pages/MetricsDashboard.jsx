@@ -23,9 +23,41 @@ export default function MetricsDashboard() {
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
   const [submitResult, setSubmitResult] = useState(null)
+  const [feedback, setFeedback] = useState({ thankyou_letters: 0, verbal_feedback: 0, testimonials: 0, vox_pop: 0 })
+  const [feedbackSaving, setFeedbackSaving] = useState(false)
+  const [feedbackSaved, setFeedbackSaved] = useState(false)
+
+  const loadFeedback = async (weekStart) => {
+    try {
+      const res = await fetch(
+        `/api/metrics/feedback?location=${encodeURIComponent(location)}&week_start=${weekStart}`,
+        { credentials: 'include' }
+      )
+      if (res.ok) {
+        const data = await res.json()
+        setFeedback({ thankyou_letters: data.thankyou_letters ?? 0, verbal_feedback: data.verbal_feedback ?? 0, testimonials: data.testimonials ?? 0, vox_pop: data.vox_pop ?? 0 })
+      }
+    } catch { /* non-critical */ }
+  }
+
+  const saveFeedback = async () => {
+    setFeedbackSaving(true); setFeedbackSaved(false)
+    try {
+      await fetch('/api/metrics/feedback', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ location, week_start: start, ...feedback }),
+      })
+      setFeedbackSaved(true)
+      setTimeout(() => setFeedbackSaved(false), 2500)
+    } catch { /* non-critical */ }
+    setFeedbackSaving(false)
+  }
 
   const preview = async () => {
     setError(''); setMetrics(null); setSubmitResult(null); setLoading(true)
+    await loadFeedback(start)
     try {
       const res = await fetch(
         `/api/metrics/preview?location=${encodeURIComponent(location)}&start=${start}&end=${end}`,
@@ -100,6 +132,40 @@ export default function MetricsDashboard() {
           </div>
         </div>
 
+        {/* Miscellaneous feedback — manually entered by staff */}
+        <div className="card">
+          <h2 className="text-xl font-bold mb-1">Miscellaneous — Feedback from Service Users</h2>
+          <p className="text-sm text-gray-500 mb-4">Enter counts for the current week. These are saved separately and included when pushing to Sheets.</p>
+          <div className="grid grid-cols-2 gap-4">
+            {[
+              { key: 'thankyou_letters', label: 'Thank you letter / Card / Email' },
+              { key: 'verbal_feedback',  label: 'Verbal Feedback' },
+              { key: 'testimonials',     label: 'Testimonials' },
+              { key: 'vox_pop',          label: 'Vox Pop (on street)' },
+            ].map(({ key, label }) => (
+              <div key={key} className="field mb-0">
+                <label className="label">{label}</label>
+                <input
+                  type="number"
+                  min="0"
+                  className="input"
+                  value={feedback[key]}
+                  onChange={e => setFeedback(f => ({ ...f, [key]: parseInt(e.target.value) || 0 }))}
+                />
+              </div>
+            ))}
+          </div>
+          <div className="mt-3 flex items-center gap-3">
+            <button onClick={saveFeedback} disabled={feedbackSaving} className="btn-secondary btn-sm">
+              {feedbackSaving ? 'Saving…' : 'Save Feedback Counts'}
+            </button>
+            {feedbackSaved && <span className="text-green-600 text-sm font-medium">✓ Saved</span>}
+            <span className="ml-auto text-sm text-gray-500 font-semibold">
+              Total: {Object.values(feedback).reduce((a, b) => a + (b || 0), 0)}
+            </span>
+          </div>
+        </div>
+
         <button onClick={preview} disabled={loading} className="btn-primary btn-lg w-full">
           {loading ? 'Loading...' : 'Preview Metrics'}
         </button>
@@ -126,7 +192,7 @@ export default function MetricsDashboard() {
                 </h2>
                 <span className="text-sm text-gray-500">{start} → {end}</span>
               </div>
-              <MetricsPreview metrics={metrics} />
+              <MetricsPreview metrics={{ ...metrics, feedback }} />
             </div>
 
             <div className="flex gap-3">

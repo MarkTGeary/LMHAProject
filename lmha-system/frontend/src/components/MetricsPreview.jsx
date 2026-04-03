@@ -3,7 +3,7 @@ export default function MetricsPreview({ metrics }) {
   const {
     section1: s1, section2: s2, section3: s3, section4: s4,
     section5_cv: s5cv, section5_statutory: s5stat,
-    limitations: lim,
+    limitations: lim, feedback: fb,
     dateRange, location,
   } = metrics
 
@@ -112,6 +112,14 @@ export default function MetricsPreview({ metrics }) {
         <Row label="Citizens Information" value={s5stat?.statutory_citizens_info} />
         <Row label="AGS (Gardaí)" value={s5stat?.statutory_ags} />
         <Row label="TOTAL" value={s5stat?.total} total />
+      </Section>
+
+      <Section title="Miscellaneous — Feedback from Service Users">
+        <Row label="Thank you letter / Card / Email" value={fb?.thankyou_letters} />
+        <Row label="Verbal Feedback" value={fb?.verbal_feedback} />
+        <Row label="Testimonials" value={fb?.testimonials} />
+        <Row label="Vox Pop (on street)" value={fb?.vox_pop} />
+        <Row label="TOTAL" value={(fb?.thankyou_letters ?? 0) + (fb?.verbal_feedback ?? 0) + (fb?.testimonials ?? 0) + (fb?.vox_pop ?? 0)} total />
       </Section>
 
       <Section title="Limitations — Out-of-Hours Contact">

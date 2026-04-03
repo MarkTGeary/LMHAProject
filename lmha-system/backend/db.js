@@ -100,6 +100,27 @@ function init() {
  * Each migration checks whether it's already been applied before running.
  */
 function migrate() {
+  // Migration 0: feedback_logs table for manually-entered miscellaneous feedback counts.
+  const tables = db.prepare("SELECT name FROM sqlite_master WHERE type='table'").all().map(r => r.name);
+  if (!tables.includes('feedback_logs')) {
+    console.log('[DB] Running migration: creating feedback_logs...');
+    db.exec(`
+      CREATE TABLE feedback_logs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        location TEXT NOT NULL,
+        week_start TEXT NOT NULL,
+        thankyou_letters INTEGER DEFAULT 0,
+        verbal_feedback INTEGER DEFAULT 0,
+        testimonials INTEGER DEFAULT 0,
+        vox_pop INTEGER DEFAULT 0,
+        created_at TEXT DEFAULT (datetime('now')),
+        updated_at TEXT DEFAULT (datetime('now')),
+        UNIQUE(location, week_start)
+      )
+    `);
+    console.log('[DB] Migration complete: feedback_logs created.');
+  }
+
   // Migration 1: Expand intake_forms with new referral sources + 3 new JSON columns.
   // Recreates the table to update the referral_source CHECK constraint.
   const cols = db.prepare("PRAGMA table_info(intake_forms)").all().map(c => c.name);
