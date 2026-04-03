@@ -39,7 +39,7 @@ router.post('/submit', requireAuth, async (req, res) => {
     res.json({ ok: true, result, metrics });
   } catch (err) {
     console.error('[Metrics] Submit error:', err);
-    res.status(500).json({ error: 'Metrics submission failed' });
+    res.status(500).json({ error: err.message || 'Metrics submission failed' });
   }
 });
 

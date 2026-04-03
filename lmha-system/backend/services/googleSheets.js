@@ -154,41 +154,77 @@ const ROW_MAP = {
   lim_total:                        93,
 };
 
-async function getAuthClient() {
+function getAuth() {
   const keyPath = path.resolve(process.env.GOOGLE_SERVICE_ACCOUNT_KEY_PATH || './service-account-key.json');
-  const auth = new google.auth.GoogleAuth({
+  return new google.auth.GoogleAuth({
     keyFile: keyPath,
     scopes: ['https://www.googleapis.com/auth/spreadsheets'],
   });
-  return auth.getClient();
 }
 
 /**
- * Find the column for a given date range by reading the header row.
+ * Find the column for a given date range by reading the two header rows.
+ * Row 1 = month names (e.g. "April"), Row 2 = day ranges (e.g. "2nd- 5th").
  * Returns the A1 column letter (e.g. 'C', 'D', ...).
  */
 async function findWeekColumn(sheets, spreadsheetId, startDate, endDate) {
   const response = await sheets.spreadsheets.values.get({
     spreadsheetId,
-    range: '1:1',
+    range: '1:2',
   });
 
-  const headers = response.data.values ? response.data.values[0] : [];
-  const weekLabel = `${startDate} to ${endDate}`;
+  const rows = response.data.values || [];
+  const row1 = rows[0] || []; // month labels
+  const row2 = rows[1] || []; // week day-range labels
 
-  let colIndex = headers.findIndex(h => h && h.toString().includes(startDate));
-  if (colIndex === -1) {
-    colIndex = headers.findIndex(h => h && h.toString().includes(weekLabel));
+  const MONTHS = ['January','February','March','April','May','June',
+                  'July','August','September','October','November','December'];
+
+  // Parse date parts directly to avoid timezone shifts
+  const [, sm, sd] = startDate.split('-').map(Number);
+  const [, em, ed] = endDate.split('-').map(Number);
+  const startMonth = MONTHS[sm - 1];
+  const endMonth   = MONTHS[em - 1];
+
+  /**
+   * Try to find the column where row1 contains targetMonth (first 3 chars)
+   * and row2 matches targetDay at the position described by positionHint:
+   *   'end'   – day appears at the end of the label  (e.g. "2nd- 5th" for day 5)
+   *   'start' – day appears at the start of the label (e.g. "30th - Apr 3" for day 30)
+   *   'any'   – day appears anywhere in the label
+   */
+  function matchCol(targetMonth, targetDay, positionHint) {
+    const suffix = '(?:st|nd|rd|th)?';
+    let dayRe;
+    if (positionHint === 'end') {
+      dayRe = new RegExp(`\\b${targetDay}${suffix}\\s*$`, 'i');
+    } else if (positionHint === 'start') {
+      dayRe = new RegExp(`^\\s*${targetDay}${suffix}\\b`, 'i');
+    } else {
+      dayRe = new RegExp(`\\b${targetDay}${suffix}\\b`, 'i');
+    }
+    const monthKey = targetMonth.toLowerCase().slice(0, 3);
+    for (let i = 0; i < row1.length; i++) {
+      if (!(row1[i] || '').toLowerCase().includes(monthKey)) continue;
+      if (dayRe.test((row2[i] || '').trim())) return columnToLetter(i + 1);
+    }
+    return null;
   }
 
-  if (colIndex === -1) {
-    throw new Error(
-      `Could not find week column for ${weekLabel} in spreadsheet header row. ` +
-      `Headers found: ${headers.slice(0, 10).join(', ')}`
-    );
-  }
+  // Try strategies in decreasing specificity
+  const col =
+    matchCol(endMonth,   ed, 'end')   ||  // e.g. April col ending in "5th"
+    matchCol(startMonth, sd, 'start') ||  // e.g. March col starting with "30th"
+    matchCol(endMonth,   ed, 'any')   ||
+    matchCol(startMonth, sd, 'any');
 
-  return columnToLetter(colIndex + 1);
+  if (col) return col;
+
+  throw new Error(
+    `Could not find week column for ${startDate} to ${endDate}. ` +
+    `Looked for ${endMonth} (ending day ${ed}) or ${startMonth} (starting day ${sd}). ` +
+    `Row-1 headers found: ${row1.slice(0, 10).join(', ')}`
+  );
 }
 
 function columnToLetter(col) {
@@ -211,8 +247,7 @@ async function writeMetrics(location, metrics, startDate, endDate) {
     throw new Error(`No spreadsheet ID configured for location: ${location}`);
   }
 
-  const authClient = await getAuthClient();
-  const sheets = google.sheets({ version: 'v4', auth: authClient });
+  const sheets = google.sheets({ version: 'v4', auth: getAuth() });
 
   const colLetter = await findWeekColumn(sheets, spreadsheetId, startDate, endDate);
   console.log(`[Sheets] Writing to column ${colLetter} for ${location} week ${startDate}–${endDate}`);

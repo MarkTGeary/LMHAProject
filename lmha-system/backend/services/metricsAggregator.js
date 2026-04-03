@@ -81,7 +81,7 @@ function aggregateMetrics(location, startDate, endDate) {
     age_55_64:  users.filter(u => u.age_group === '55-64').length,
     age_65_plus: users.filter(u => u.age_group === '65+').length,
   };
-  s1.total_people = s1.total_male + s1.total_female + s1.total_other_gender;
+  s1.total_people = s1.total_new + s1.total_repeat;
 
   // --- Section 2: Support Requirements ---
   const s2 = {
