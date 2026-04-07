@@ -117,8 +117,8 @@ router.get('/', requireAuth, (req, res) => {
   if (service_user_id) { query += ' AND b.service_user_id = ?'; params.push(service_user_id); }
   if (search) {
     const like = '%' + search.trim() + '%';
-    query += ' AND (su.full_name LIKE ? OR su.phone LIKE ? OR b.full_name LIKE ? OR b.phone LIKE ?)';
-    params.push(like, like, like, like);
+    query += ' AND (su.full_name LIKE ? OR su.phone LIKE ?)';
+    params.push(like, like);
   }
 
   const order = service_user_id ? 'DESC' : 'ASC';
