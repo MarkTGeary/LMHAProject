@@ -45,6 +45,14 @@ router.post('/', requireAuth, (req, res) => {
   const booking = db.prepare('SELECT * FROM bookings WHERE id = ?').get(booking_id);
   if (!booking) return res.status(404).json({ error: 'Booking not found' });
 
+  // 3-week lock
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - 21);
+  cutoff.setHours(0, 0, 0, 0);
+  if (new Date(booking.date) < cutoff) {
+    return res.status(403).json({ error: 'This record is locked — bookings older than 3 weeks cannot be edited' });
+  }
+
   let userId = service_user_id || existing_user_id;
 
   if (is_repeat && existing_user_id) {

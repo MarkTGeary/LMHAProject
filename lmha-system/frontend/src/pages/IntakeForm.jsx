@@ -186,6 +186,7 @@ export default function IntakeForm() {
   const [page, setPage] = useState(1)
   const [booking, setBooking] = useState(null)
   const [existingIntake, setExistingIntake] = useState(null)
+  const [isLocked, setIsLocked] = useState(false)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
@@ -193,8 +194,6 @@ export default function IntakeForm() {
   // Repeat user state
   const [isRepeat, setIsRepeat] = useState(false)
   const [existingUser, setExistingUser] = useState(null)
-  const [visitHistory, setVisitHistory] = useState([])
-  const [historyOpen, setHistoryOpen] = useState(false)
 
   // Page 1 — Service User Info
   const [su, setSu] = useState({
@@ -229,8 +228,12 @@ export default function IntakeForm() {
         .then(r => r.ok ? r.json() : null).catch(() => null),
     ]).then(([b, intake]) => {
       setBooking(b)
+      const cutoff = new Date()
+      cutoff.setDate(cutoff.getDate() - 21)
+      cutoff.setHours(0, 0, 0, 0)
+      setIsLocked(new Date(b.date) < cutoff)
       if (b.full_name) setSu(prev => ({ ...prev, full_name: b.full_name, phone: b.phone || '' }))
-      if (b.new_or_repeat === 'Repeat') { setIsRepeat(true); setHistoryOpen(true) }
+      if (b.new_or_repeat === 'Repeat') setIsRepeat(true)
       if (intake) {
         setExistingIntake(intake)
         setP2({
@@ -253,18 +256,6 @@ export default function IntakeForm() {
     }).finally(() => setLoading(false))
   }, [bookingId, user])
 
-  // Load visit history when a repeat service user is known
-  useEffect(() => {
-    const userId = existingUser?.id || booking?.service_user_id
-    if (!userId) { setVisitHistory([]); return }
-    fetch(`/api/bookings?service_user_id=${userId}`, { credentials: 'include' })
-      .then(r => r.json())
-      .then(data => {
-        // Exclude the current booking
-        setVisitHistory(Array.isArray(data) ? data.filter(b => b.id !== parseInt(bookingId)) : [])
-      })
-      .catch(() => {})
-  }, [existingUser, booking?.service_user_id, bookingId])
 
   // Load service user data if booking has one
   useEffect(() => {
@@ -374,6 +365,12 @@ export default function IntakeForm() {
         </div>
       )}
 
+      {isLocked && (
+        <div className="bg-gray-100 border-2 border-gray-400 rounded-xl p-4 mb-4 text-gray-700 font-semibold">
+          This record is locked. Bookings older than 3 weeks cannot be edited.
+        </div>
+      )}
+
       {existingIntake && (
         <div className="bg-amber-50 border-2 border-amber-300 rounded-xl p-3 mb-4 text-amber-800 text-sm font-medium">
           ✏️ Editing existing intake form
@@ -418,67 +415,6 @@ export default function IntakeForm() {
             )}
           </div>
 
-          {/* Visit history — shown when repeat user is confirmed */}
-          {isRepeat && visitHistory.length > 0 && (
-            <div className="card border-2 border-indigo-200 bg-indigo-50">
-              <button
-                type="button"
-                onClick={() => setHistoryOpen(o => !o)}
-                className="w-full flex items-center justify-between gap-3"
-              >
-                <div>
-                  <div className="font-bold text-indigo-900 text-lg">Past Visits</div>
-                  <div className="text-sm text-indigo-600 mt-0.5">{visitHistory.length} previous booking{visitHistory.length !== 1 ? 's' : ''}</div>
-                </div>
-                <span className={`text-indigo-500 text-2xl transition-transform ${historyOpen ? 'rotate-180' : ''}`}>▾</span>
-              </button>
-
-              {historyOpen && (
-                <div className="mt-4 space-y-2">
-                  {visitHistory.map(b => {
-                    const outcomeColor =
-                      b.outcome === 'Attended'       ? 'text-green-700 bg-green-100' :
-                      b.outcome === 'Did Not Attend' ? 'text-red-700 bg-red-100' :
-                                                       'text-yellow-700 bg-yellow-100'
-                    return (
-                      <div key={b.id} className="bg-white rounded-xl border border-indigo-200 px-4 py-3">
-                        <div className="flex items-start justify-between gap-2 flex-wrap">
-                          <div>
-                            <div className="font-semibold text-gray-800">
-                              {new Date(b.date + 'T12:00:00').toLocaleDateString('en-IE', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })}
-                              <span className="text-gray-500 font-normal"> at {b.time_booked}</span>
-                            </div>
-                            <div className="text-sm text-gray-500 mt-0.5">{b.interaction_type} · {b.location}</div>
-                          </div>
-                          <div className="flex gap-1.5 flex-wrap">
-                            <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${outcomeColor}`}>
-                              {b.outcome || 'Pending'}
-                            </span>
-                            {b.intake_complete
-                              ? <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-green-100 text-green-700">Intake done</span>
-                              : <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-orange-100 text-orange-700">No intake</span>
-                            }
-                            {b.status === 'Closed' && (
-                              <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-gray-200 text-gray-600">Closed</span>
-                            )}
-                          </div>
-                        </div>
-                        {b.notes && (
-                          <div className="text-sm text-gray-500 mt-2 border-t border-gray-100 pt-2">{b.notes}</div>
-                        )}
-                      </div>
-                    )
-                  })}
-                </div>
-              )}
-            </div>
-          )}
-
-          {isRepeat && visitHistory.length === 0 && (existingUser || booking?.service_user_id) && (
-            <div className="card border border-indigo-200 bg-indigo-50 text-sm text-indigo-600 text-center py-3">
-              No previous visits on record
-            </div>
-          )}
 
           {/* Only show full form if not repeat (or if editing) */}
           {(!isRepeat || existingIntake) && (
@@ -593,7 +529,7 @@ export default function IntakeForm() {
             </div>
           </div>
 
-          <button onClick={goToPage2} className="btn-primary btn-lg w-full">
+          <button onClick={goToPage2} disabled={isLocked} className="btn-primary btn-lg w-full">
             Continue to Page 2 →
           </button>
         </div>
@@ -737,7 +673,7 @@ export default function IntakeForm() {
               className="btn-secondary btn-lg flex-1">
               ← Back
             </button>
-            <button onClick={submit} disabled={saving} className="btn-success btn-lg flex-1">
+            <button onClick={submit} disabled={saving || isLocked} className="btn-success btn-lg flex-1">
               {saving ? 'Saving...' : 'Submit Intake Form'}
             </button>
           </div>

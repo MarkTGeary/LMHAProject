@@ -5,6 +5,8 @@ export default function RepeatUserSearch({ onSelect, onClear }) {
   const [results, setResults] = useState([])
   const [loading, setLoading] = useState(false)
   const [selected, setSelected] = useState(null)
+  const [history, setHistory] = useState([])
+  const [historyOpen, setHistoryOpen] = useState(false)
   const debounceRef = useRef(null)
 
   useEffect(() => {
@@ -22,15 +24,24 @@ export default function RepeatUserSearch({ onSelect, onClear }) {
     }, 300)
   }, [query])
 
-  const choose = (user) => {
+  const choose = async (user) => {
     setSelected(user)
     setResults([])
     setQuery('')
     onSelect(user)
+    try {
+      const r = await fetch(`/api/bookings?service_user_id=${user.id}`, { credentials: 'include' })
+      const data = await r.json()
+      setHistory(Array.isArray(data) ? data : [])
+    } catch {
+      setHistory([])
+    }
   }
 
   const clear = () => {
     setSelected(null)
+    setHistory([])
+    setHistoryOpen(false)
     onClear()
   }
 
@@ -49,6 +60,45 @@ export default function RepeatUserSearch({ onSelect, onClear }) {
           </div>
           <button onClick={clear} className="btn-outline btn-sm ml-2">Change</button>
         </div>
+        {history.length > 0 && (
+          <div className="mt-3 pt-3 border-t border-blue-200">
+            <button
+              type="button"
+              onClick={() => setHistoryOpen(o => !o)}
+              className="w-full flex items-center justify-between text-xs font-semibold text-blue-700 uppercase tracking-wide mb-2"
+            >
+              <span>Visit History ({history.length})</span>
+              <span>{historyOpen ? '▲' : '▼'}</span>
+            </button>
+            {historyOpen && (
+              <div className="space-y-1.5 max-h-64 overflow-y-auto pr-1">
+                {history.map(b => {
+                  const outcomeColor =
+                    b.outcome === 'Attended'       ? 'text-green-700 bg-green-100' :
+                    b.outcome === 'Did Not Attend' ? 'text-red-700 bg-red-100' :
+                                                     'text-yellow-700 bg-yellow-100'
+                  return (
+                    <div key={b.id} className="bg-white rounded-lg border border-blue-100 px-3 py-2">
+                      <div className="flex items-center justify-between gap-2">
+                        <div>
+                          <span className="font-semibold text-sm text-gray-800">
+                            {new Date(b.date + 'T12:00:00').toLocaleDateString('en-IE', { day: 'numeric', month: 'short', year: 'numeric' })}
+                          </span>
+                          <span className="text-xs text-gray-500 ml-2">{b.interaction_type}</span>
+                        </div>
+                        <span className={`text-xs font-semibold px-2 py-0.5 rounded-full shrink-0 ${outcomeColor}`}>
+                          {b.outcome || 'Pending'}
+                        </span>
+                      </div>
+                      <div className="text-xs text-gray-500 mt-0.5">{b.location}{b.time_booked ? ` · ${b.time_booked}` : ''}</div>
+                      {b.notes && <div className="text-xs text-gray-400 italic mt-1">{b.notes}</div>}
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+        )}
       </div>
     )
   }

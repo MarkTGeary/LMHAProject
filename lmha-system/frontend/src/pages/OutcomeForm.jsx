@@ -16,6 +16,7 @@ export default function OutcomeForm() {
 
   const [booking, setBooking] = useState(null)
   const [hasIntake, setHasIntake] = useState(false)
+  const [isLocked, setIsLocked] = useState(false)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
@@ -35,6 +36,10 @@ export default function OutcomeForm() {
       .then(r => r.json())
       .then(b => {
         setBooking(b)
+        const cutoff = new Date()
+        cutoff.setDate(cutoff.getDate() - 21)
+        cutoff.setHours(0, 0, 0, 0)
+        setIsLocked(new Date(b.date) < cutoff)
         setForm({
           outcome: b.outcome !== 'Pending' ? b.outcome : '',
           time_in: b.time_in || '',
@@ -144,6 +149,12 @@ export default function OutcomeForm() {
                 : <span className="badge-intake-missing">⚠ Intake missing</span>
               }
             </div>
+          </div>
+        )}
+
+        {isLocked && (
+          <div className="bg-gray-100 border-2 border-gray-400 rounded-xl p-4 text-gray-700 font-semibold">
+            This record is locked. Bookings older than 3 weeks cannot be edited.
           </div>
         )}
 
@@ -262,16 +273,16 @@ export default function OutcomeForm() {
         </div>
 
         {/* Actions */}
-        <button onClick={saveOutcome} disabled={saving} className="btn-primary btn-lg w-full">
+        <button onClick={saveOutcome} disabled={saving || isLocked} className="btn-primary btn-lg w-full">
           {saving ? 'Saving...' : 'Save Outcome'}
         </button>
 
         {booking?.status === 'Active' && (
           <button
             onClick={closeCase}
-            disabled={saving || !hasIntake || !form.outcome || form.outcome === 'Pending' || form.type_of_support.length === 0}
+            disabled={saving || isLocked || !hasIntake || !form.outcome || form.outcome === 'Pending' || form.type_of_support.length === 0}
             className={`btn-lg w-full font-bold ${
-              hasIntake && form.outcome && form.outcome !== 'Pending' && form.type_of_support.length > 0
+              !isLocked && hasIntake && form.outcome && form.outcome !== 'Pending' && form.type_of_support.length > 0
                 ? 'btn-success'
                 : 'btn-secondary opacity-50 cursor-not-allowed'
             }`}

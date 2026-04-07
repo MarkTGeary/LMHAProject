@@ -51,6 +51,7 @@ export default function NewBooking({ editMode }) {
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
   const [existingUser, setExistingUser] = useState(null)
+  const [isLocked, setIsLocked] = useState(false)
 
   // Load booking for edit mode
   useEffect(() => {
@@ -58,6 +59,10 @@ export default function NewBooking({ editMode }) {
       fetch(`/api/bookings/${id}`, { credentials: 'include' })
         .then(r => r.json())
         .then(b => {
+          const cutoff = new Date()
+          cutoff.setDate(cutoff.getDate() - 21)
+          cutoff.setHours(0, 0, 0, 0)
+          setIsLocked(new Date(b.date) < cutoff)
           setForm({
             location: b.location,
             date: b.date,
@@ -150,6 +155,13 @@ export default function NewBooking({ editMode }) {
   return (
     <Layout title={editMode ? 'Edit Booking' : 'New Booking'} back="/cases">
       <div className="space-y-6 pb-10">
+        {/* Lock banner */}
+        {isLocked && (
+          <div className="bg-gray-100 border-2 border-gray-400 rounded-xl p-4 text-gray-700 font-semibold">
+            This record is locked. Bookings older than 3 weeks cannot be edited.
+          </div>
+        )}
+
         {/* Error */}
         {error && (
           <div className="bg-red-50 border-2 border-red-300 rounded-xl p-4 text-red-700 font-semibold">
@@ -161,19 +173,12 @@ export default function NewBooking({ editMode }) {
         <div className="card">
           <h2 className="text-xl font-bold mb-4">Person Details</h2>
 
-          {!existingUser && (
-            <div className="field">
-              <label className="label">Search existing records</label>
-              <RepeatUserSearch onSelect={handleUserSelect} onClear={handleUserClear} />
-            </div>
-          )}
+          <div className="field">
+            <label className="label">Search existing records</label>
+            <RepeatUserSearch onSelect={handleUserSelect} onClear={handleUserClear} />
+          </div>
 
-          {existingUser ? (
-            <div className="field">
-              <label className="label">Linked to existing record</label>
-              <RepeatUserSearch onSelect={handleUserSelect} onClear={handleUserClear} />
-            </div>
-          ) : (
+          {!existingUser && (
             <>
               <div className="field">
                 <label className="label">Full Name <span className="text-red-500">*</span></label>
@@ -321,7 +326,7 @@ export default function NewBooking({ editMode }) {
 
         <button
           onClick={submit}
-          disabled={saving}
+          disabled={saving || isLocked}
           className="btn-primary btn-lg w-full"
         >
           {saving ? 'Saving...' : editMode ? 'Update Booking' : 'Create Booking'}

@@ -270,6 +270,14 @@ router.patch('/:id', requireAuth, (req, res) => {
   const existing = db.prepare('SELECT * FROM bookings WHERE id = ?').get(req.params.id);
   if (!existing) return res.status(404).json({ error: 'Not found' });
 
+  // 3-week lock — bookings older than 21 days cannot be edited
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - 21);
+  cutoff.setHours(0, 0, 0, 0);
+  if (new Date(existing.date) < cutoff) {
+    return res.status(403).json({ error: 'This record is locked — bookings older than 3 weeks cannot be edited' });
+  }
+
   const {
     date, time_booked, location, interaction_type, new_or_repeat, referred_from,
     type_of_support, carer_attended, peer_support_worker, limitations, notes,

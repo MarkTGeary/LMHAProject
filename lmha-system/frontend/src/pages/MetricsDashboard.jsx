@@ -13,6 +13,7 @@ export default function MetricsDashboard() {
   const { location } = useAuth()
 
   const thisMon = getMondayOfWeek(new Date())
+  const currentWeekStart = thisMon.toISOString().slice(0, 10)
   const thisSun = new Date(thisMon)
   thisSun.setDate(thisMon.getDate() + 6)
 
@@ -49,7 +50,7 @@ export default function MetricsDashboard() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ location, week_start: start, ...feedback }),
+        body: JSON.stringify({ location, week_start: currentWeekStart, ...feedback }),
       })
       setFeedbackSaved(true)
       setTimeout(() => setFeedbackSaved(false), 2500)
@@ -127,10 +128,10 @@ export default function MetricsDashboard() {
     setEnd(sun.toISOString().slice(0, 10))
   }
 
-  // Reload feedback whenever the selected week changes
+  // Load current week's feedback for the misc panel on mount
   useEffect(() => {
-    loadFeedback(start)
-  }, [start])
+    loadFeedback(currentWeekStart)
+  }, [])
 
   return (
     <Layout title="Submit Metrics">
@@ -241,7 +242,7 @@ export default function MetricsDashboard() {
           {miscOpen && (
             <div className="p-4 bg-white">
               <p className="text-sm text-gray-500 mb-4">
-                Counts for week of <strong>{start}</strong>. Saved separately and included when pushing to Sheets. Select a past week above to record feedback received later.
+                Always recorded for the current week (<strong>{currentWeekStart}</strong>). Feedback is tracked the week it is received.
               </p>
               <div className="grid grid-cols-2 gap-4">
                 {[
