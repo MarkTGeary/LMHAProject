@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useAuth } from '../App'
 import Layout from '../components/Layout'
 import MetricsPreview from '../components/MetricsPreview'
@@ -27,6 +27,7 @@ export default function MetricsDashboard() {
   const [feedback, setFeedback] = useState({ thankyou_letters: 0, verbal_feedback: 0, testimonials: 0, vox_pop: 0 })
   const [feedbackSaving, setFeedbackSaving] = useState(false)
   const [feedbackSaved, setFeedbackSaved] = useState(false)
+  const [miscOpen, setMiscOpen] = useState(false)
 
   const loadFeedback = async (weekStart) => {
     try {
@@ -126,6 +127,11 @@ export default function MetricsDashboard() {
     setEnd(sun.toISOString().slice(0, 10))
   }
 
+  // Reload feedback whenever the selected week changes
+  useEffect(() => {
+    loadFeedback(start)
+  }, [start])
+
   return (
     <Layout title="Submit Metrics">
       <div className="space-y-5 pb-10">
@@ -148,40 +154,6 @@ export default function MetricsDashboard() {
           </div>
           <div className="mt-4 p-3 bg-gray-50 rounded-xl text-sm text-gray-600">
             Location: <strong>{location}</strong>
-          </div>
-        </div>
-
-        {/* Miscellaneous feedback — manually entered by staff */}
-        <div className="card">
-          <h2 className="text-xl font-bold mb-1">Miscellaneous — Feedback from Service Users</h2>
-          <p className="text-sm text-gray-500 mb-4">Enter counts for the current week. These are saved separately and included when pushing to Sheets.</p>
-          <div className="grid grid-cols-2 gap-4">
-            {[
-              { key: 'thankyou_letters', label: 'Thank you letter / Card / Email' },
-              { key: 'verbal_feedback',  label: 'Verbal Feedback' },
-              { key: 'testimonials',     label: 'Testimonials' },
-              { key: 'vox_pop',          label: 'Vox Pop (on street)' },
-            ].map(({ key, label }) => (
-              <div key={key} className="field mb-0">
-                <label className="label">{label}</label>
-                <input
-                  type="number"
-                  min="0"
-                  className="input"
-                  value={feedback[key]}
-                  onChange={e => setFeedback(f => ({ ...f, [key]: parseInt(e.target.value) || 0 }))}
-                />
-              </div>
-            ))}
-          </div>
-          <div className="mt-3 flex items-center gap-3">
-            <button onClick={saveFeedback} disabled={feedbackSaving} className="btn-secondary btn-sm">
-              {feedbackSaving ? 'Saving…' : 'Save Feedback Counts'}
-            </button>
-            {feedbackSaved && <span className="text-green-600 text-sm font-medium">✓ Saved</span>}
-            <span className="ml-auto text-sm text-gray-500 font-semibold">
-              Total: {Object.values(feedback).reduce((a, b) => a + (b || 0), 0)}
-            </span>
           </div>
         </div>
 
@@ -252,6 +224,53 @@ export default function MetricsDashboard() {
             )}
           </>
         )}
+        {/* Miscellaneous — bottom tab panel */}
+        <div className="border border-gray-200 rounded-xl overflow-hidden">
+          <button
+            onClick={() => setMiscOpen(o => !o)}
+            className="w-full flex items-center justify-between px-4 py-3 bg-gray-100 hover:bg-gray-200 transition-colors text-sm font-semibold text-gray-700"
+          >
+            <span>Miscellaneous — Feedback from Service Users</span>
+            <span className="flex items-center gap-2">
+              <span className="text-gray-500 font-normal">
+                Total: {Object.values(feedback).reduce((a, b) => a + (b || 0), 0)}
+              </span>
+              <span>{miscOpen ? '▲' : '▼'}</span>
+            </span>
+          </button>
+          {miscOpen && (
+            <div className="p-4 bg-white">
+              <p className="text-sm text-gray-500 mb-4">
+                Counts for week of <strong>{start}</strong>. Saved separately and included when pushing to Sheets. Select a past week above to record feedback received later.
+              </p>
+              <div className="grid grid-cols-2 gap-4">
+                {[
+                  { key: 'thankyou_letters', label: 'Thank you letter / Card / Email' },
+                  { key: 'verbal_feedback',  label: 'Verbal Feedback' },
+                  { key: 'testimonials',     label: 'Testimonials' },
+                  { key: 'vox_pop',          label: 'Vox Pop (on street)' },
+                ].map(({ key, label }) => (
+                  <div key={key} className="field mb-0">
+                    <label className="label">{label}</label>
+                    <input
+                      type="number"
+                      min="0"
+                      className="input"
+                      value={feedback[key]}
+                      onChange={e => setFeedback(f => ({ ...f, [key]: parseInt(e.target.value) || 0 }))}
+                    />
+                  </div>
+                ))}
+              </div>
+              <div className="mt-3 flex items-center gap-3">
+                <button onClick={saveFeedback} disabled={feedbackSaving} className="btn-secondary btn-sm">
+                  {feedbackSaving ? 'Saving…' : 'Save Feedback Counts'}
+                </button>
+                {feedbackSaved && <span className="text-green-600 text-sm font-medium">✓ Saved</span>}
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     </Layout>
   )
