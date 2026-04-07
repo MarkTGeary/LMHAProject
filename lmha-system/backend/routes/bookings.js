@@ -76,7 +76,7 @@ function checkDoubleBooking(location, dateStr, timeStr, excludeId = null) {
 
 // GET /api/bookings — list with filters
 router.get('/', requireAuth, (req, res) => {
-  const { status, location, date, today, this_week, intake_status, start_date, end_date } = req.query;
+  const { status, location, date, today, this_week, intake_status, start_date, end_date, service_user_id, search } = req.query;
 
   let query = `
     SELECT b.*,
@@ -114,8 +114,15 @@ router.get('/', requireAuth, (req, res) => {
   } else if (intake_status === 'complete') {
     query += ' AND i.id IS NOT NULL';
   }
+  if (service_user_id) { query += ' AND b.service_user_id = ?'; params.push(service_user_id); }
+  if (search) {
+    const like = '%' + search.trim() + '%';
+    query += ' AND (su.full_name LIKE ? OR su.phone LIKE ? OR b.full_name LIKE ? OR b.phone LIKE ?)';
+    params.push(like, like, like, like);
+  }
 
-  query += ' ORDER BY b.date ASC, b.time_booked ASC';
+  const order = service_user_id ? 'DESC' : 'ASC';
+  query += ` ORDER BY b.date ${order}, b.time_booked ${order}`;
 
   const rows = db.prepare(query).all(...params);
   res.json(rows);

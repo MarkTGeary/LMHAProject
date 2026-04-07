@@ -15,7 +15,7 @@ export default function Layout({ children, title, back }) {
     <div className="min-h-screen bg-gray-50 flex flex-col">
       {/* Header */}
       <header className="bg-white border-b border-gray-200 sticky top-0 z-40 shadow-sm">
-        <div className="max-w-4xl mx-auto px-4 h-16 flex items-center gap-3">
+        <div className="max-w-5xl mx-auto px-4 md:px-6 h-16 flex items-center gap-3">
           {back ? (
             <button
               onClick={() => nav(back)}
@@ -64,30 +64,31 @@ export default function Layout({ children, title, back }) {
       </header>
 
       {/* Main content */}
-      <main className="flex-1 max-w-4xl mx-auto w-full px-4 py-6">
+      <main className="flex-1 max-w-5xl mx-auto w-full px-4 md:px-6 py-6">
         {children}
       </main>
 
       {/* Bottom nav for tablet */}
       <nav className="bg-white border-t border-gray-200 sticky bottom-0 z-40 no-print">
-        <div className="max-w-4xl mx-auto flex">
+        <div className="max-w-5xl mx-auto flex w-full">
           {[
             { to: '/', icon: '🏠', label: 'Home' },
             { to: '/bookings/new', icon: '➕', label: 'New Booking' },
             { to: '/cases', icon: '📋', label: 'Cases' },
             { to: '/schedule', icon: '📅', label: 'Schedule' },
             { to: '/metrics', icon: '📊', label: 'Metrics' },
+            { to: '/settings', icon: '⚙️', label: 'Settings' },
           ].map(({ to, icon, label }) => (
             <Link
               key={to}
               to={to}
-              className={`flex-1 flex flex-col items-center py-3 text-xs font-medium transition-colors min-h-[56px] ${
+              className={`flex-1 flex flex-col items-center py-3 text-xs md:text-sm font-medium transition-colors min-h-[56px] md:min-h-[64px] gap-0.5 ${
                 path === to
                   ? 'text-blue-600 bg-blue-50'
                   : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
               }`}
             >
-              <span className="text-xl">{icon}</span>
+              <span className="text-xl md:text-2xl">{icon}</span>
               <span>{label}</span>
             </Link>
           ))}

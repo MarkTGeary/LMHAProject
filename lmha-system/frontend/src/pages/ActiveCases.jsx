@@ -12,6 +12,7 @@ export default function ActiveCases() {
     status: 'Active',
     period: 'all',
     intakeStatus: 'all',
+    search: '',
   })
 
   const load = useCallback(() => {
@@ -23,6 +24,7 @@ export default function ActiveCases() {
     if (filters.period === 'today') params.set('today', '1')
     else if (filters.period === 'week') params.set('this_week', '1')
     if (filters.intakeStatus !== 'all') params.set('intake_status', filters.intakeStatus)
+    if (filters.search.trim()) params.set('search', filters.search.trim())
 
     fetch(`/api/bookings?${params}`, { credentials: 'include' })
       .then(r => r.json())
@@ -32,15 +34,19 @@ export default function ActiveCases() {
 
   useEffect(() => { load() }, [load])
 
-  const setFilter = (key, value) => setFilters(f => ({ ...f, [key]: value }))
+  const setFilter = (key, value) => setFilters(f => ({
+    ...f,
+    [key]: value,
+    ...(key === 'status' ? { search: '' } : {}),
+  }))
 
   return (
     <Layout title="Active Cases">
       <div className="space-y-5">
         {/* Filter bar */}
-        <div className="card p-4 space-y-3">
-          <div className="flex flex-wrap gap-2">
-            <span className="text-sm font-semibold text-gray-600 self-center">Status:</span>
+        <div className="card p-4 flex flex-col md:flex-row md:gap-6 md:items-center md:flex-wrap gap-3">
+          <div className="flex flex-wrap gap-2 items-center">
+            <span className="text-sm font-semibold text-gray-600">Status:</span>
             {['Active', 'Closed', ''].map(s => (
               <button
                 key={s}
@@ -53,8 +59,8 @@ export default function ActiveCases() {
               </button>
             ))}
           </div>
-          <div className="flex flex-wrap gap-2">
-            <span className="text-sm font-semibold text-gray-600 self-center">Period:</span>
+          <div className="flex flex-wrap gap-2 items-center">
+            <span className="text-sm font-semibold text-gray-600">Period:</span>
             {[['all', 'All time'], ['today', 'Today'], ['week', 'This week']].map(([v, l]) => (
               <button
                 key={v}
@@ -67,8 +73,22 @@ export default function ActiveCases() {
               </button>
             ))}
           </div>
-          <div className="flex flex-wrap gap-2">
-            <span className="text-sm font-semibold text-gray-600 self-center">Intake:</span>
+          {filters.status !== 'Active' && (
+            <div className="flex items-center gap-2 w-full md:w-auto md:flex-1 min-w-[200px]">
+              <input
+                className="input py-2 min-h-[40px] text-sm"
+                placeholder="Search name or phone…"
+                value={filters.search}
+                onChange={e => setFilter('search', e.target.value)}
+              />
+              {filters.search && (
+                <button onClick={() => setFilter('search', '')} className="text-gray-400 hover:text-gray-600 text-xl shrink-0">✕</button>
+              )}
+            </div>
+          )}
+
+          <div className="flex flex-wrap gap-2 items-center">
+            <span className="text-sm font-semibold text-gray-600">Intake:</span>
             {[['all', 'All'], ['missing', 'Missing'], ['complete', 'Complete']].map(([v, l]) => (
               <button
                 key={v}

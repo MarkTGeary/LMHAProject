@@ -7,13 +7,13 @@ const cors = require('cors');
 const path = require('path');
 
 // Init DB (runs migrations)
-require('./db');
+const db = require('./db');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Allowed emails from env
-const ALLOWED_EMAILS = (process.env.ALLOWED_EMAILS || '').split(',').map(e => e.trim().toLowerCase());
+// First email in ALLOWED_EMAILS env is permanently protected (cannot be removed via UI)
+const PROTECTED_EMAIL = (process.env.ALLOWED_EMAILS || '').split(',')[0]?.trim().toLowerCase() || '';
 
 // Middleware
 app.use(cors({
@@ -53,7 +53,8 @@ passport.use(new GoogleStrategy(
   (accessToken, refreshToken, profile, done) => {
     const email = (profile.emails?.[0]?.value || '').toLowerCase();
 
-    if (!ALLOWED_EMAILS.includes(email)) {
+    const allowed = db.prepare('SELECT 1 FROM allowed_emails WHERE email = ?').get(email);
+    if (!allowed) {
       console.warn(`[Auth] Rejected login attempt from: ${email}`);
       return done(null, false, { message: 'Email not on allowlist' });
     }
@@ -75,7 +76,8 @@ passport.deserializeUser((user, done) => done(null, user));
 
 // Routes
 app.use('/auth', require('./routes/auth'));
-const { requireLocation } = require('./middleware/requireAuth');
+const { requireAuth, requireLocation } = require('./middleware/requireAuth');
+app.use('/api/admin', requireAuth, require('./routes/admin'));
 app.use('/api/bookings', requireLocation, require('./routes/bookings'));
 app.use('/api/service-users', requireLocation, require('./routes/serviceUsers'));
 app.use('/api/intake-forms', requireLocation, require('./routes/intakeForms'));
@@ -93,5 +95,5 @@ app.use((err, req, res, _next) => {
 
 app.listen(PORT, () => {
   console.log(`LMHA backend running on http://localhost:${PORT}`);
-  console.log(`Allowed emails: ${ALLOWED_EMAILS.join(', ') || '(none configured)'}`);
+  console.log(`Protected admin email: ${PROTECTED_EMAIL || '(none set)'}`);
 });

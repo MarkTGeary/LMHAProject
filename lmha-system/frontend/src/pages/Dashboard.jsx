@@ -37,7 +37,7 @@ export default function Dashboard() {
 
         {/* Quick stats */}
         {stats && (
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div className="card text-center">
               <div className="text-4xl font-bold text-blue-600">{stats.active}</div>
               <div className="text-sm text-gray-500 mt-1">Active Cases</div>
@@ -60,7 +60,7 @@ export default function Dashboard() {
         )}
 
         {/* Main action buttons */}
-        <div className="space-y-3">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <Link to="/bookings/new" className="btn btn-primary btn-lg w-full text-xl">
             <span className="mr-3 text-2xl">➕</span>
             New Booking

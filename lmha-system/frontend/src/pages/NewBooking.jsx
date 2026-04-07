@@ -214,7 +214,7 @@ export default function NewBooking({ editMode }) {
               slotsLoading ? (
                 <div className="text-gray-500 text-sm py-3">Loading available slots...</div>
               ) : slots.length > 0 ? (
-                <div className="grid grid-cols-4 gap-2">
+                <div className="grid grid-cols-3 md:grid-cols-6 gap-2">
                   {slots.map(s => (
                     <button
                       key={s.time}
@@ -245,7 +245,7 @@ export default function NewBooking({ editMode }) {
 
           <div className="field">
             <label className="label">Interaction Type <span className="text-red-500">*</span></label>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
               {INTERACTION_TYPES.map(({ value, icon, color }) => (
                 <button
                   key={value}

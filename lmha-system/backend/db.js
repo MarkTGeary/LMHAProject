@@ -121,6 +121,23 @@ function migrate() {
     console.log('[DB] Migration complete: feedback_logs created.');
   }
 
+  // Migration 2: allowed_emails table — replaces the static ALLOWED_EMAILS env var.
+  if (!tables.includes('allowed_emails')) {
+    console.log('[DB] Running migration: creating allowed_emails...');
+    db.exec(`
+      CREATE TABLE allowed_emails (
+        email TEXT PRIMARY KEY,
+        added_by TEXT,
+        added_at TEXT DEFAULT (datetime('now'))
+      )
+    `);
+    // Seed from env so existing deployments don't lose access
+    const envEmails = (process.env.ALLOWED_EMAILS || '').split(',').map(e => e.trim().toLowerCase()).filter(Boolean);
+    const insert = db.prepare('INSERT OR IGNORE INTO allowed_emails (email, added_by) VALUES (?, ?)');
+    for (const e of envEmails) insert.run(e, 'system');
+    console.log(`[DB] Migration complete: allowed_emails seeded with ${envEmails.length} email(s).`);
+  }
+
   // Migration 1: Expand intake_forms with new referral sources + 3 new JSON columns.
   // Recreates the table to update the referral_source CHECK constraint.
   const cols = db.prepare("PRAGMA table_info(intake_forms)").all().map(c => c.name);
