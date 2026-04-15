@@ -163,6 +163,13 @@ const ROW_MAP = {
 };
 
 function getAuth() {
+  if (process.env.GOOGLE_SERVICE_ACCOUNT_JSON) {
+    const credentials = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_JSON);
+    return new google.auth.GoogleAuth({
+      credentials,
+      scopes: ['https://www.googleapis.com/auth/spreadsheets'],
+    });
+  }
   const keyPath = path.resolve(process.env.GOOGLE_SERVICE_ACCOUNT_KEY_PATH || './service-account-key.json');
   return new google.auth.GoogleAuth({
     keyFile: keyPath,
