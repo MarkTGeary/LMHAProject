@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { createContext, useContext, useState, useEffect } from 'react'
+import { apiUrl } from './lib/api'
 import Login from './pages/Login'
 import LocationSelect from './pages/LocationSelect'
 import Dashboard from './pages/Dashboard'
@@ -38,7 +39,7 @@ export default function App() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    fetch('/auth/me', { credentials: 'include' })
+    fetch(apiUrl('/auth/me'), { credentials: 'include' })
       .then(r => r.json())
       .then(data => {
         if (data.email) {
@@ -51,7 +52,7 @@ export default function App() {
   }, [])
 
   const logout = async () => {
-    await fetch('/auth/logout', { credentials: 'include' })
+    await fetch(apiUrl('/auth/logout'), { credentials: 'include' })
     setUser(null)
     setLocation(null)
   }

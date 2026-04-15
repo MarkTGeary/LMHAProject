@@ -1,5 +1,6 @@
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../App'
+import { apiUrl } from '../lib/api'
 
 export default function LocationSelect() {
   const { user, logout, setLocation } = useAuth()
@@ -7,7 +8,7 @@ export default function LocationSelect() {
 
   const select = async (loc) => {
     try {
-      await fetch('/auth/location', {
+      await fetch(apiUrl('/auth/location'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',

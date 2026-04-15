@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../App'
 import Layout from '../components/Layout'
+import { apiUrl } from '../lib/api'
 
 export default function Dashboard() {
   const { location } = useAuth()
@@ -11,8 +12,8 @@ export default function Dashboard() {
   useEffect(() => {
     // Load today's quick stats
     Promise.all([
-      fetch(`/api/bookings?status=Active&location=${encodeURIComponent(location)}`, { credentials: 'include' }).then(r => r.json()),
-      fetch(`/api/bookings?today=1&location=${encodeURIComponent(location)}`, { credentials: 'include' }).then(r => r.json()),
+      fetch(apiUrl(`/api/bookings?status=Active&location=${encodeURIComponent(location)}`), { credentials: 'include' }).then(r => r.json()),
+      fetch(apiUrl(`/api/bookings?today=1&location=${encodeURIComponent(location)}`), { credentials: 'include' }).then(r => r.json()),
     ]).then(([active, todayBookings]) => {
       setStats({
         active: active.length,

@@ -1,15 +1,23 @@
-const { DatabaseSync } = require('node:sqlite');
-const path = require('path');
+require('dotenv').config();
+const { createClient } = require('@libsql/client');
 
-const DB_PATH = path.join(__dirname, 'lmha.db');
-const db = new DatabaseSync(DB_PATH);
+const _client = createClient({
+  url: process.env.TURSO_DATABASE_URL,
+  authToken: process.env.TURSO_AUTH_TOKEN,
+});
 
-// Enable WAL mode and foreign keys
-db.exec('PRAGMA journal_mode = WAL');
-db.exec('PRAGMA foreign_keys = ON');
+// Thin wrapper so we can safely attach .ready without mutating the libsql client
+const db = {
+  execute:         (...args) => _client.execute(...args),
+  executeMultiple: (...args) => _client.executeMultiple(...args),
+  batch:           (...args) => _client.batch(...args),
+};
 
-function init() {
-  db.exec(`
+async function initAndMigrate() {
+  await _client.execute('PRAGMA foreign_keys = ON');
+
+  // ── Core tables ──────────────────────────────────────────────────
+  await _client.executeMultiple(`
     CREATE TABLE IF NOT EXISTS service_users (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       full_name TEXT NOT NULL,
@@ -62,49 +70,49 @@ function init() {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       booking_id INTEGER UNIQUE REFERENCES bookings(id),
       service_user_id INTEGER REFERENCES service_users(id),
-
       referral_source TEXT CHECK(referral_source IN (
         'Self-referral',
         'Local NGO and Community Partner Agency',
-        'Primary Care Provider',
-        'NGO Stakeholder',
+        'HSE Health Services',
+        'GP',
         'Community Mental Health Team',
         'Liaison Psychiatry Team',
         'Crisis Resolution Team',
+        'CAST',
+        'LSW',
+        'LTSP',
+        'Probation',
         'Other'
       )),
       referred_by_name TEXT,
       referred_by_role TEXT,
       referred_by_phone TEXT,
       referred_by_email TEXT,
-
       reasons_for_attending TEXT,
-
       privacy_acknowledged INTEGER DEFAULT 0,
       safety_agreement_acknowledged INTEGER DEFAULT 0,
       confidentiality_limits_explained INTEGER DEFAULT 0,
-
       staff_member TEXT,
       staff_signature TEXT,
       signed_date TEXT,
-
-      completed_at TEXT DEFAULT (datetime('now'))
+      completed_at TEXT DEFAULT (datetime('now')),
+      support_needs TEXT,
+      onward_referrals TEXT,
+      limitations_detail TEXT
     );
   `);
 
-  console.log('Database initialised at', DB_PATH);
-}
+  console.log('[DB] Core tables ready.');
 
-/**
- * Migrations — run after init() so tables always exist first.
- * Each migration checks whether it's already been applied before running.
- */
-function migrate() {
-  // Migration 0: feedback_logs table for manually-entered miscellaneous feedback counts.
-  const tables = db.prepare("SELECT name FROM sqlite_master WHERE type='table'").all().map(r => r.name);
+  // ── Migration: feedback_logs ──────────────────────────────────────
+  const tablesResult = await _client.execute(
+    "SELECT name FROM sqlite_master WHERE type='table'"
+  );
+  const tables = tablesResult.rows.map(r => r.name);
+
   if (!tables.includes('feedback_logs')) {
     console.log('[DB] Running migration: creating feedback_logs...');
-    db.exec(`
+    await _client.executeMultiple(`
       CREATE TABLE feedback_logs (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         location TEXT NOT NULL,
@@ -121,107 +129,29 @@ function migrate() {
     console.log('[DB] Migration complete: feedback_logs created.');
   }
 
-  // Migration 2: allowed_emails table — replaces the static ALLOWED_EMAILS env var.
+  // ── Migration: allowed_emails ─────────────────────────────────────
   if (!tables.includes('allowed_emails')) {
     console.log('[DB] Running migration: creating allowed_emails...');
-    db.exec(`
+    await _client.executeMultiple(`
       CREATE TABLE allowed_emails (
         email TEXT PRIMARY KEY,
         added_by TEXT,
         added_at TEXT DEFAULT (datetime('now'))
       )
     `);
-    // Seed from env so existing deployments don't lose access
     const envEmails = (process.env.ALLOWED_EMAILS || '').split(',').map(e => e.trim().toLowerCase()).filter(Boolean);
-    const insert = db.prepare('INSERT OR IGNORE INTO allowed_emails (email, added_by) VALUES (?, ?)');
-    for (const e of envEmails) insert.run(e, 'system');
+    for (const e of envEmails) {
+      await _client.execute({
+        sql: 'INSERT OR IGNORE INTO allowed_emails (email, added_by) VALUES (?, ?)',
+        args: [e, 'system'],
+      });
+    }
     console.log(`[DB] Migration complete: allowed_emails seeded with ${envEmails.length} email(s).`);
   }
 
-  // Migration 1: Expand intake_forms with new referral sources + 3 new JSON columns.
-  // Recreates the table to update the referral_source CHECK constraint.
-  const cols = db.prepare("PRAGMA table_info(intake_forms)").all().map(c => c.name);
-  if (!cols.includes('onward_referrals')) {
-    console.log('[DB] Running migration: expanding intake_forms...');
-    db.exec(`
-      CREATE TABLE intake_forms_v2 (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        booking_id INTEGER UNIQUE REFERENCES bookings(id),
-        service_user_id INTEGER REFERENCES service_users(id),
-
-        referral_source TEXT CHECK(referral_source IN (
-          'Self-referral',
-          'Local NGO and Community Partner Agency',
-          'HSE Health Services',
-          'GP',
-          'Community Mental Health Team',
-          'Liaison Psychiatry Team',
-          'Crisis Resolution Team',
-          'CAST',
-          'LSW',
-          'LTSP',
-          'Probation',
-          'Other'
-        )),
-        referred_by_name TEXT,
-        referred_by_role TEXT,
-        referred_by_phone TEXT,
-        referred_by_email TEXT,
-
-        reasons_for_attending TEXT,
-
-        privacy_acknowledged INTEGER DEFAULT 0,
-        safety_agreement_acknowledged INTEGER DEFAULT 0,
-        confidentiality_limits_explained INTEGER DEFAULT 0,
-
-        staff_member TEXT,
-        staff_signature TEXT,
-        signed_date TEXT,
-
-        completed_at TEXT DEFAULT (datetime('now')),
-
-        -- Section 3: granular support needs (JSON array of string keys)
-        support_needs TEXT,
-        -- Section 5: onward referrals made by staff (JSON array of string keys)
-        onward_referrals TEXT,
-        -- Limitations: out-of-hours contact attempts recorded (JSON array of string keys)
-        limitations_detail TEXT
-      )
-    `);
-
-    // Copy existing rows; remap old referral_source values that no longer exist
-    db.exec(`
-      INSERT INTO intake_forms_v2 (
-        id, booking_id, service_user_id,
-        referral_source,
-        referred_by_name, referred_by_role, referred_by_phone, referred_by_email,
-        reasons_for_attending,
-        privacy_acknowledged, safety_agreement_acknowledged, confidentiality_limits_explained,
-        staff_member, staff_signature, signed_date, completed_at,
-        support_needs, onward_referrals, limitations_detail
-      )
-      SELECT
-        id, booking_id, service_user_id,
-        CASE referral_source
-          WHEN 'Primary Care Provider' THEN 'HSE Health Services'
-          WHEN 'NGO Stakeholder'       THEN 'Local NGO and Community Partner Agency'
-          ELSE referral_source
-        END,
-        referred_by_name, referred_by_role, referred_by_phone, referred_by_email,
-        reasons_for_attending,
-        privacy_acknowledged, safety_agreement_acknowledged, confidentiality_limits_explained,
-        staff_member, staff_signature, signed_date, completed_at,
-        NULL, NULL, NULL
-      FROM intake_forms
-    `);
-
-    db.exec('DROP TABLE intake_forms');
-    db.exec('ALTER TABLE intake_forms_v2 RENAME TO intake_forms');
-    console.log('[DB] Migration complete: intake_forms expanded.');
-  }
+  console.log('[DB] Init and migrations complete.');
 }
 
-init();
-migrate();
+db.ready = initAndMigrate();
 
 module.exports = db;

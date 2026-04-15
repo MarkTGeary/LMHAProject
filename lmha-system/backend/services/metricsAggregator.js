@@ -1,31 +1,37 @@
 const db = require('../db');
 
 /**
- * Aggregate all metric sections from SQLite for a date range + location.
+ * Aggregate all metric sections from Turso for a date range + location.
  * Returns an object matching the Google Sheets sections.
  */
-function aggregateMetrics(location, startDate, endDate) {
-  const bookings = db.prepare(`
-    SELECT b.*,
-           i.referral_source, i.reasons_for_attending,
-           i.support_needs, i.onward_referrals, i.limitations_detail
-    FROM bookings b
-    LEFT JOIN intake_forms i ON i.booking_id = b.id
-    WHERE b.location = ?
-      AND b.date BETWEEN ? AND ?
-      AND b.status != 'Cancelled'
-  `).all(location, startDate, endDate);
+async function aggregateMetrics(location, startDate, endDate) {
+  const bookingsResult = await db.execute({
+    sql: `SELECT b.*,
+                 i.referral_source, i.reasons_for_attending,
+                 i.support_needs, i.onward_referrals, i.limitations_detail
+          FROM bookings b
+          LEFT JOIN intake_forms i ON i.booking_id = b.id
+          WHERE b.location = ?
+            AND b.date BETWEEN ? AND ?
+            AND b.status != 'Cancelled'`,
+    args: [location, startDate, endDate],
+  });
+  const bookings = bookingsResult.rows;
 
-  const attended = bookings.filter(b => b.outcome === 'Attended');
-  const dna      = bookings.filter(b => b.outcome === 'Did Not Attend');
-  const phoneCalls = bookings.filter(b => b.interaction_type === 'Phone Call');
+  const attended    = bookings.filter(b => b.outcome === 'Attended');
+  const dna         = bookings.filter(b => b.outcome === 'Did Not Attend');
+  const phoneCalls  = bookings.filter(b => b.interaction_type === 'Phone Call');
 
   // Unique service users for demographics
   const userIds = [...new Set(bookings.map(b => b.service_user_id).filter(Boolean))];
-  const users = userIds.length
-    ? db.prepare(`SELECT * FROM service_users WHERE id IN (${userIds.map(() => '?').join(',')})`)
-        .all(...userIds)
-    : [];
+  let users = [];
+  if (userIds.length) {
+    const usersResult = await db.execute({
+      sql: `SELECT * FROM service_users WHERE id IN (${userIds.map(() => '?').join(',')})`,
+      args: userIds,
+    });
+    users = usersResult.rows;
+  }
 
   // --- Helpers ---
 
@@ -101,7 +107,7 @@ function aggregateMetrics(location, startDate, endDate) {
   s2.total = s2.information_seeking + s2.social_support_signposting +
              s2.one_to_one_peer_support + s2.crisis_support + s2.other_supports;
 
-  // --- Section 3: Support Requirements by Type (from support_needs on intake) ---
+  // --- Section 3: Support Requirements by Type ---
   const s3 = {
     info_statutory_mh_hse:   countNeed('info_statutory_mh'),
     info_non_statutory_mh:   countNeed('info_non_statutory_mh'),
@@ -136,7 +142,7 @@ function aggregateMetrics(location, startDate, endDate) {
              s4.hse_health_services + s4.gp + s4.other_referral +
              s4.cast_referral + s4.lsw_referral + s4.ltsp_referral + s4.probation_referral;
 
-  // --- Section 5: Advocacy / Follow-up (onward referrals made by staff) ---
+  // --- Section 5: Advocacy / Follow-up ---
   const s5_cv = {
     cv_counselling:       countOnward('cv_counselling'),
     cv_housing:           countOnward('cv_housing'),
@@ -148,45 +154,42 @@ function aggregateMetrics(location, startDate, endDate) {
   s5_cv.total = Object.values(s5_cv).reduce((a, b) => a + b, 0);
 
   const s5_statutory = {
-    statutory_hse_mh:          countOnward('hse_mh'),
-    statutory_hse_primary_care: countOnward('hse_primary_care'),
-    statutory_hse_disability:   countOnward('hse_disability'),
-    statutory_hse_older_persons: countOnward('hse_older_persons'),
-    statutory_hse_crt:          countOnward('hse_crt'),
-    statutory_tusla:            countOnward('tusla'),
-    statutory_mabs:             countOnward('mabs'),
-    statutory_dept_social:      countOnward('dept_social_protection'),
-    statutory_citizens_info:    countOnward('citizens_information'),
-    statutory_ags:              countOnward('ags'),
+    statutory_hse_mh:             countOnward('hse_mh'),
+    statutory_hse_primary_care:   countOnward('hse_primary_care'),
+    statutory_hse_disability:     countOnward('hse_disability'),
+    statutory_hse_older_persons:  countOnward('hse_older_persons'),
+    statutory_hse_crt:            countOnward('hse_crt'),
+    statutory_tusla:              countOnward('tusla'),
+    statutory_mabs:               countOnward('mabs'),
+    statutory_dept_social:        countOnward('dept_social_protection'),
+    statutory_citizens_info:      countOnward('citizens_information'),
+    statutory_ags:                countOnward('ags'),
   };
   s5_statutory.total = Object.values(s5_statutory).reduce((a, b) => a + b, 0);
 
-  // --- Limitations: out-of-hours contact attempts (location-specific days/times) ---
+  // --- Limitations ---
   const limitations = location === 'LMHA'
     ? {
-        // LMHA: Mon–Fri 11:00–17:00 — closed weekends, outside 11–17
-        lim_day1:          countLimitation('saturday'),
-        lim_day2:          countLimitation('sunday'),
-        lim_day3:          0, // only 2 closed days for LMHA
-        lim_time_early:    countLimitation('before_11am'),
-        lim_time_late:     countLimitation('after_5pm'),
+        lim_day1:            countLimitation('saturday'),
+        lim_day2:            countLimitation('sunday'),
+        lim_day3:            0,
+        lim_time_early:      countLimitation('before_11am'),
+        lim_time_late:       countLimitation('after_5pm'),
         lim_calls_out_hours: countLimitation('calls_out_of_hours'),
         lim_text_out_hours:  countLimitation('text_out_of_hours'),
       }
     : {
-        // Solace Café: Thu–Sun 18:00–00:00 — closed Mon/Tue/Wed, outside 18–00
-        lim_day1:          countLimitation('monday'),
-        lim_day2:          countLimitation('tuesday'),
-        lim_day3:          countLimitation('wednesday'),
-        lim_time_early:    countLimitation('before_6pm'),
-        lim_time_late:     countLimitation('after_midnight'),
+        lim_day1:            countLimitation('monday'),
+        lim_day2:            countLimitation('tuesday'),
+        lim_day3:            countLimitation('wednesday'),
+        lim_time_early:      countLimitation('before_6pm'),
+        lim_time_late:       countLimitation('after_midnight'),
         lim_calls_out_hours: countLimitation('calls_out_of_hours'),
         lim_text_out_hours:  countLimitation('text_out_of_hours'),
       };
   limitations.total = limitations.lim_day1 + limitations.lim_day2 + limitations.lim_day3 +
                       limitations.lim_time_early + limitations.lim_time_late +
                       limitations.lim_calls_out_hours + limitations.lim_text_out_hours;
-  // Total individuals who couldn't be facilitated (bookings that recorded any limitation)
   limitations.lim_indv_not_facilitated = bookings.filter(b =>
     parseJson(b.limitations_detail).length > 0
   ).length;

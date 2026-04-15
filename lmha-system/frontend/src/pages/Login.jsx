@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../App'
+import { apiUrl } from '../lib/api'
 
 export default function Login() {
   const { user } = useAuth()
@@ -31,7 +32,7 @@ export default function Login() {
           </div>
         )}
 
-        <a href="/auth/google" className="w-full">
+        <a href={apiUrl('/auth/google')} className="w-full">
           <button className="btn-primary btn-lg w-full flex items-center justify-center gap-3">
             <img src="https://www.google.com/favicon.ico" className="w-5 h-5" alt="" />
             Sign in with Google

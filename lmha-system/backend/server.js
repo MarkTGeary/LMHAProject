@@ -4,38 +4,32 @@ const session = require('express-session');
 const passport = require('passport');
 const GoogleStrategy = require('passport-google-oauth20').Strategy;
 const cors = require('cors');
-const path = require('path');
 
-// Init DB (runs migrations)
 const db = require('./db');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
+const BACKEND_URL  = process.env.BACKEND_URL  || `http://localhost:${PORT}`;
 
-// First email in ALLOWED_EMAILS env is permanently protected (cannot be removed via UI)
 const PROTECTED_EMAIL = (process.env.ALLOWED_EMAILS || '').split(',')[0]?.trim().toLowerCase() || '';
 
 // Middleware
 app.use(cors({
-  origin: 'http://localhost:5173',
+  origin: FRONTEND_URL,
   credentials: true,
 }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Sessions — file-based store, survives restarts, no native compilation needed
-const FileStore = require('session-file-store')(session);
+// Sessions — MemoryStore (single Render instance; users re-login on restart)
 app.use(session({
-  store: new FileStore({
-    path: path.join(__dirname, 'sessions'),
-    retries: 1,
-    ttl: 8 * 60 * 60, // 8 hours in seconds
-  }),
   secret: process.env.SESSION_SECRET || 'lmha-dev-secret-change-me',
   resave: false,
   saveUninitialized: false,
   cookie: {
-    secure: false, // set true in production with HTTPS
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
     maxAge: 8 * 60 * 60 * 1000, // 8-hour session
   },
 }));
@@ -48,15 +42,22 @@ passport.use(new GoogleStrategy(
   {
     clientID: process.env.GOOGLE_CLIENT_ID,
     clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-    callbackURL: `http://localhost:${PORT}/auth/google/callback`,
+    callbackURL: `${BACKEND_URL}/auth/google/callback`,
   },
-  (accessToken, refreshToken, profile, done) => {
+  async (accessToken, refreshToken, profile, done) => {
     const email = (profile.emails?.[0]?.value || '').toLowerCase();
 
-    const allowed = db.prepare('SELECT 1 FROM allowed_emails WHERE email = ?').get(email);
-    if (!allowed) {
-      console.warn(`[Auth] Rejected login attempt from: ${email}`);
-      return done(null, false, { message: 'Email not on allowlist' });
+    try {
+      const result = await db.execute({
+        sql: 'SELECT 1 FROM allowed_emails WHERE email = ?',
+        args: [email],
+      });
+      if (!result.rows.length) {
+        console.warn(`[Auth] Rejected login attempt from: ${email}`);
+        return done(null, false, { message: 'Email not on allowlist' });
+      }
+    } catch (err) {
+      return done(err);
     }
 
     const user = {
@@ -77,23 +78,32 @@ passport.deserializeUser((user, done) => done(null, user));
 // Routes
 app.use('/auth', require('./routes/auth'));
 const { requireAuth, requireLocation } = require('./middleware/requireAuth');
-app.use('/api/admin', requireAuth, require('./routes/admin'));
-app.use('/api/bookings', requireLocation, require('./routes/bookings'));
+app.use('/api/admin',         requireAuth,     require('./routes/admin'));
+app.use('/api/bookings',      requireLocation, require('./routes/bookings'));
 app.use('/api/service-users', requireLocation, require('./routes/serviceUsers'));
-app.use('/api/intake-forms', requireLocation, require('./routes/intakeForms'));
-app.use('/api/metrics', requireLocation, require('./routes/metrics'));
+app.use('/api/intake-forms',  requireLocation, require('./routes/intakeForms'));
+app.use('/api/metrics',       requireLocation, require('./routes/metrics'));
 
 // Health check
 app.get('/api/health', (req, res) => res.json({ ok: true, timestamp: new Date().toISOString() }));
 
-// Global error handler — logs the real error instead of silently returning 500
+// Global error handler
 app.use((err, req, res, _next) => {
   console.error('[ERROR]', req.method, req.path, err.message || err);
   const isDev = process.env.NODE_ENV !== 'production';
   res.status(500).json({ error: isDev ? (err.message || 'Internal server error') : 'Internal server error' });
 });
 
-app.listen(PORT, () => {
-  console.log(`LMHA backend running on http://localhost:${PORT}`);
-  console.log(`Protected admin email: ${PROTECTED_EMAIL || '(none set)'}`);
-});
+// Wait for DB to be fully initialised before accepting traffic
+db.ready
+  .then(() => {
+    app.listen(PORT, () => {
+      console.log(`LMHA backend running on port ${PORT}`);
+      console.log(`Frontend: ${FRONTEND_URL}`);
+      console.log(`Protected admin email: ${PROTECTED_EMAIL || '(none set)'}`);
+    });
+  })
+  .catch(err => {
+    console.error('[DB] Initialisation failed:', err);
+    process.exit(1);
+  });

@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { apiUrl } from '../lib/api'
 
 export default function RepeatUserSearch({ onSelect, onClear }) {
   const [query, setQuery] = useState('')
@@ -16,7 +17,7 @@ export default function RepeatUserSearch({ onSelect, onClear }) {
     debounceRef.current = setTimeout(async () => {
       setLoading(true)
       try {
-        const r = await fetch(`/api/service-users/search?q=${encodeURIComponent(query)}`, { credentials: 'include' })
+        const r = await fetch(apiUrl(`/api/service-users/search?q=${encodeURIComponent(query)}`), { credentials: 'include' })
         const data = await r.json()
         setResults(data)
       } catch {}
@@ -30,7 +31,7 @@ export default function RepeatUserSearch({ onSelect, onClear }) {
     setQuery('')
     onSelect(user)
     try {
-      const r = await fetch(`/api/bookings?service_user_id=${user.id}`, { credentials: 'include' })
+      const r = await fetch(apiUrl(`/api/bookings?service_user_id=${user.id}`), { credentials: 'include' })
       const data = await r.json()
       setHistory(Array.isArray(data) ? data : [])
     } catch {

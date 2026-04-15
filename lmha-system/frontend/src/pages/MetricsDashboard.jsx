@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useAuth } from '../App'
 import Layout from '../components/Layout'
 import MetricsPreview from '../components/MetricsPreview'
+import { apiUrl } from '../lib/api'
 
 function getMondayOfWeek(d = new Date()) {
   const day = d.getDay()
@@ -33,7 +34,7 @@ export default function MetricsDashboard() {
   const loadFeedback = async (weekStart) => {
     try {
       const res = await fetch(
-        `/api/metrics/feedback?location=${encodeURIComponent(location)}&week_start=${weekStart}`,
+        apiUrl(`/api/metrics/feedback?location=${encodeURIComponent(location)}&week_start=${weekStart}`),
         { credentials: 'include' }
       )
       if (res.ok) {
@@ -46,7 +47,7 @@ export default function MetricsDashboard() {
   const saveFeedback = async () => {
     setFeedbackSaving(true); setFeedbackSaved(false)
     try {
-      await fetch('/api/metrics/feedback', {
+      await fetch(apiUrl('/api/metrics/feedback'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -62,7 +63,7 @@ export default function MetricsDashboard() {
     setError(''); setMetrics(null); setSubmitResult(null); setLoadingSheets(true)
     try {
       const res = await fetch(
-        `/api/metrics/read?location=${encodeURIComponent(location)}&start=${start}&end=${end}`,
+        apiUrl(`/api/metrics/read?location=${encodeURIComponent(location)}&start=${start}&end=${end}`),
         { credentials: 'include' }
       )
       const data = await res.json()
@@ -81,7 +82,7 @@ export default function MetricsDashboard() {
     await loadFeedback(start)
     try {
       const res = await fetch(
-        `/api/metrics/preview?location=${encodeURIComponent(location)}&start=${start}&end=${end}`,
+        apiUrl(`/api/metrics/preview?location=${encodeURIComponent(location)}&start=${start}&end=${end}`),
         { credentials: 'include' }
       )
       const data = await res.json()
@@ -98,7 +99,7 @@ export default function MetricsDashboard() {
     if (!confirm(`Push metrics for ${location} (${start} to ${end}) to Google Sheets? This cannot be undone.`)) return
     setError(''); setSubmitting(true); setSubmitResult(null)
     try {
-      const res = await fetch('/api/metrics/submit', {
+      const res = await fetch(apiUrl('/api/metrics/submit'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',

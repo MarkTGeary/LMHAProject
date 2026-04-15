@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import Layout from '../components/Layout'
+import { apiUrl } from '../lib/api'
 
 export default function Settings() {
   const [emails, setEmails] = useState([])
@@ -12,7 +13,7 @@ export default function Settings() {
 
   const load = () => {
     setLoading(true)
-    fetch('/api/admin/emails', { credentials: 'include' })
+    fetch(apiUrl('/api/admin/emails'), { credentials: 'include' })
       .then(r => r.json())
       .then(data => {
         setEmails(data.emails || [])
@@ -30,7 +31,7 @@ export default function Settings() {
     const email = newEmail.trim().toLowerCase()
     if (!email) return
     setAdding(true)
-    const res = await fetch('/api/admin/emails', {
+    const res = await fetch(apiUrl('/api/admin/emails'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
@@ -47,7 +48,7 @@ export default function Settings() {
   const removeEmail = async (email) => {
     setError('')
     setSuccess('')
-    const res = await fetch(`/api/admin/emails/${encodeURIComponent(email)}`, {
+    const res = await fetch(apiUrl(`/api/admin/emails/${encodeURIComponent(email)}`), {
       method: 'DELETE',
       credentials: 'include',
     })

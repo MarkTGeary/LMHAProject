@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { useAuth } from '../App'
 import Layout from '../components/Layout'
 import RepeatUserSearch from '../components/RepeatUserSearch'
+import { apiUrl } from '../lib/api'
 
 const LOCATION_RULES = {
   'LMHA': { days: [1, 2, 3, 4, 5], label: 'Mon–Fri', startHour: 11, endHour: 17 },
@@ -56,7 +57,7 @@ export default function NewBooking({ editMode }) {
   // Load booking for edit mode
   useEffect(() => {
     if (editMode && id) {
-      fetch(`/api/bookings/${id}`, { credentials: 'include' })
+      fetch(apiUrl(`/api/bookings/${id}`), { credentials: 'include' })
         .then(r => r.json())
         .then(b => {
           const cutoff = new Date()
@@ -87,7 +88,7 @@ export default function NewBooking({ editMode }) {
     if (!isDayValid(form.date, form.location)) { setSlots([]); return }
 
     setSlotsLoading(true)
-    fetch(`/api/bookings/available-slots?date=${form.date}&location=${encodeURIComponent(form.location)}`, { credentials: 'include' })
+    fetch(apiUrl(`/api/bookings/available-slots?date=${form.date}&location=${encodeURIComponent(form.location)}`), { credentials: 'include' })
       .then(r => r.json())
       .then(data => {
         setSlots(data.slots || [])
@@ -133,7 +134,7 @@ export default function NewBooking({ editMode }) {
     setSaving(true)
 
     try {
-      const url = editMode ? `/api/bookings/${id}` : '/api/bookings'
+      const url = apiUrl(editMode ? `/api/bookings/${id}` : '/api/bookings')
       const method = editMode ? 'PATCH' : 'POST'
       const res = await fetch(url, {
         method,
