@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const db = require('../db');
 const { requireAuth } = require('../middleware/requireAuth');
+const { LOCK_DAYS } = require('../lib/constants');
 
 // GET /api/intake-forms/booking/:bookingId
 router.get('/booking/:bookingId', requireAuth, async (req, res, next) => {
@@ -43,6 +44,19 @@ router.post('/', requireAuth, async (req, res, next) => {
       return res.status(400).json({ error: 'All three acknowledgements must be checked before submitting' });
     }
 
+    if (support_needs !== undefined && !Array.isArray(support_needs)) {
+      return res.status(400).json({ error: 'support_needs must be an array' });
+    }
+    if (onward_referrals !== undefined && !Array.isArray(onward_referrals)) {
+      return res.status(400).json({ error: 'onward_referrals must be an array' });
+    }
+    if (limitations_detail !== undefined && !Array.isArray(limitations_detail)) {
+      return res.status(400).json({ error: 'limitations_detail must be an array' });
+    }
+    if (reasons_for_attending !== undefined && !Array.isArray(reasons_for_attending)) {
+      return res.status(400).json({ error: 'reasons_for_attending must be an array' });
+    }
+
     const bookingResult = await db.execute({
       sql: 'SELECT * FROM bookings WHERE id = ?',
       args: [booking_id],
@@ -51,7 +65,7 @@ router.post('/', requireAuth, async (req, res, next) => {
     const booking = bookingResult.rows[0];
 
     const cutoff = new Date();
-    cutoff.setDate(cutoff.getDate() - 21);
+    cutoff.setDate(cutoff.getDate() - LOCK_DAYS);
     cutoff.setHours(0, 0, 0, 0);
     if (new Date(booking.date) < cutoff) {
       return res.status(403).json({ error: 'This record is locked — bookings older than 3 weeks cannot be edited' });

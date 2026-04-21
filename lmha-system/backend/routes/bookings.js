@@ -2,26 +2,20 @@ const express = require('express');
 const router = express.Router();
 const db = require('../db');
 const { requireAuth } = require('../middleware/requireAuth');
+const { LOCATION_RULES, LOCK_DAYS } = require('../lib/constants');
 
-// Booking hours validation
-const LOCATION_RULES = {
-  'LMHA': {
-    days: [1, 2, 3, 4, 5], // Mon-Fri
-    startHour: 11,
-    endHour: 17,
-  },
-  'Solace Café': {
-    days: [4, 5, 6, 0], // Thu-Sun
-    startHour: 18,
-    endHour: 24,
-  },
-};
-
-function validateBookingTime(location, dateStr, timeStr) {
+function validateBookingTime(location, dateStr, timeStr, allowPast = false) {
   const rules = LOCATION_RULES[location];
   if (!rules) return { valid: false, error: 'Unknown location' };
 
-  const date = new Date(dateStr);
+  const date = new Date(dateStr + 'T12:00:00');
+
+  if (!allowPast) {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    if (date < today) return { valid: false, error: 'Booking date cannot be in the past' };
+  }
+
   const dayOfWeek = date.getDay();
 
   if (!rules.days.includes(dayOfWeek)) {
@@ -124,27 +118,6 @@ router.get('/', requireAuth, async (req, res, next) => {
     sql += ` ORDER BY b.date ${order}, b.time_booked ${order}`;
 
     const result = await db.execute({ sql, args });
-    res.json(result.rows);
-  } catch (err) { next(err); }
-});
-
-// GET /api/bookings/schedule?date=&location=
-router.get('/schedule', requireAuth, async (req, res, next) => {
-  try {
-    const { date, location } = req.query;
-    if (!date || !location) return res.status(400).json({ error: 'date and location required' });
-
-    const result = await db.execute({
-      sql: `SELECT b.*,
-                   su.full_name, su.phone,
-                   CASE WHEN i.id IS NOT NULL THEN 1 ELSE 0 END as intake_complete
-            FROM bookings b
-            LEFT JOIN service_users su ON b.service_user_id = su.id
-            LEFT JOIN intake_forms i ON i.booking_id = b.id
-            WHERE b.date = ? AND b.location = ? AND b.status != 'Cancelled'
-            ORDER BY b.time_booked ASC`,
-      args: [date, location],
-    });
     res.json(result.rows);
   } catch (err) { next(err); }
 });
@@ -285,7 +258,7 @@ router.patch('/:id', requireAuth, async (req, res, next) => {
     const existing = existingResult.rows[0];
 
     const cutoff = new Date();
-    cutoff.setDate(cutoff.getDate() - 21);
+    cutoff.setDate(cutoff.getDate() - LOCK_DAYS);
     cutoff.setHours(0, 0, 0, 0);
     if (new Date(existing.date) < cutoff) {
       return res.status(403).json({ error: 'This record is locked — bookings older than 3 weeks cannot be edited' });
@@ -302,7 +275,7 @@ router.patch('/:id', requireAuth, async (req, res, next) => {
     const newLocation = location || existing.location;
 
     if (date || time_booked || location) {
-      const timeValid = validateBookingTime(newLocation, newDate, newTime);
+      const timeValid = validateBookingTime(newLocation, newDate, newTime, true);
       if (!timeValid.valid) return res.status(400).json({ error: timeValid.error });
 
       const conflict = await checkDoubleBooking(newLocation, newDate, newTime, parseInt(req.params.id));

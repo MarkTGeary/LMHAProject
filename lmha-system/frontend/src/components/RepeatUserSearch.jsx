@@ -5,6 +5,7 @@ export default function RepeatUserSearch({ onSelect, onClear }) {
   const [query, setQuery] = useState('')
   const [results, setResults] = useState([])
   const [loading, setLoading] = useState(false)
+  const [searchError, setSearchError] = useState(false)
   const [selected, setSelected] = useState(null)
   const [history, setHistory] = useState([])
   const [historyOpen, setHistoryOpen] = useState(false)
@@ -12,15 +13,15 @@ export default function RepeatUserSearch({ onSelect, onClear }) {
 
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current)
-    if (query.length < 2) { setResults([]); return }
+    if (query.length < 2) { setResults([]); setSearchError(false); return }
 
     debounceRef.current = setTimeout(async () => {
-      setLoading(true)
+      setLoading(true); setSearchError(false)
       try {
         const r = await fetch(apiUrl(`/api/service-users/search?q=${encodeURIComponent(query)}`), { credentials: 'include' })
         const data = await r.json()
         setResults(data)
-      } catch {}
+      } catch { setSearchError(true) }
       setLoading(false)
     }, 300)
   }, [query])
@@ -129,7 +130,12 @@ export default function RepeatUserSearch({ onSelect, onClear }) {
           ))}
         </div>
       )}
-      {query.length >= 2 && results.length === 0 && !loading && (
+      {searchError && (
+        <div className="absolute z-50 w-full bg-red-50 border-2 border-red-300 rounded-xl shadow-xl mt-1 px-4 py-3 text-red-700 text-sm">
+          Search failed — check connection and try again
+        </div>
+      )}
+      {query.length >= 2 && results.length === 0 && !loading && !searchError && (
         <div className="absolute z-50 w-full bg-white border-2 border-gray-200 rounded-xl shadow-xl mt-1 px-4 py-3 text-gray-500 text-sm">
           No existing records found — will create new service user
         </div>

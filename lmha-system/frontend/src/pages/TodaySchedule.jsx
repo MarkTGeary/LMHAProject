@@ -2,11 +2,7 @@ import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../App'
 import Layout from '../components/Layout'
-
-const LOCATION_HOURS = {
-  'LMHA':        { start: 11, end: 17, days: [1, 2, 3, 4, 5] },
-  'Solace Café': { start: 18, end: 24, days: [4, 5, 6, 0] },
-}
+import { LOCATION_RULES } from '../lib/constants'
 const DAY_NAMES = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat']
 const DAY_FULL  = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday']
 
@@ -36,7 +32,8 @@ function getColor(b) {
 
 export default function WeeklySchedule() {
   const { location } = useAuth()
-  const hours = LOCATION_HOURS[location] || LOCATION_HOURS['LMHA']
+  const _rules = LOCATION_RULES[location] || LOCATION_RULES['LMHA']
+  const hours = { start: _rules.startHour, end: _rules.endHour, days: _rules.days }
   const [weekStart, setWeekStart] = useState(() => getMondayOf(new Date()))
   const [bookings, setBookings]   = useState([])
   const [loading, setLoading]     = useState(true)

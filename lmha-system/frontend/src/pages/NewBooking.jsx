@@ -4,11 +4,7 @@ import { useAuth } from '../App'
 import Layout from '../components/Layout'
 import RepeatUserSearch from '../components/RepeatUserSearch'
 import { apiUrl } from '../lib/api'
-
-const LOCATION_RULES = {
-  'LMHA': { days: [1, 2, 3, 4, 5], label: 'Mon–Fri', startHour: 11, endHour: 17 },
-  'Solace Café': { days: [4, 5, 6, 0], label: 'Thu–Sun', startHour: 18, endHour: 24 },
-}
+import { LOCATION_RULES, LOCK_DAYS } from '../lib/constants'
 
 const INTERACTION_TYPES = [
   { value: 'Phone Call', icon: '📞', color: 'bg-green-100 border-green-400 text-green-800' },
@@ -61,7 +57,7 @@ export default function NewBooking({ editMode }) {
         .then(r => r.json())
         .then(b => {
           const cutoff = new Date()
-          cutoff.setDate(cutoff.getDate() - 21)
+          cutoff.setDate(cutoff.getDate() - LOCK_DAYS)
           cutoff.setHours(0, 0, 0, 0)
           setIsLocked(new Date(b.date) < cutoff)
           setForm({

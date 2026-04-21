@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import Layout from '../components/Layout'
 import { apiUrl } from '../lib/api'
+import { LOCK_DAYS } from '../lib/constants'
 
 const SUPPORT_TYPES = [
   { code: 'SS', label: 'Social Support' },
@@ -38,7 +39,7 @@ export default function OutcomeForm() {
       .then(b => {
         setBooking(b)
         const cutoff = new Date()
-        cutoff.setDate(cutoff.getDate() - 21)
+        cutoff.setDate(cutoff.getDate() - LOCK_DAYS)
         cutoff.setHours(0, 0, 0, 0)
         setIsLocked(new Date(b.date) < cutoff)
         setForm({

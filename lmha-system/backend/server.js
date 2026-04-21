@@ -4,6 +4,8 @@ const session = require('express-session');
 const passport = require('passport');
 const GoogleStrategy = require('passport-google-oauth20').Strategy;
 const cors = require('cors');
+const { Redis } = require('@upstash/redis');
+const RedisStore = require('connect-redis').default;
 
 const db = require('./db');
 
@@ -22,8 +24,19 @@ app.use(cors({
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Sessions — MemoryStore (single Render instance; users re-login on restart)
+// Sessions — Upstash Redis (persistent across serverless invocations)
+const sessionStore = process.env.UPSTASH_REDIS_REST_URL
+  ? new RedisStore({
+      client: new Redis({
+        url: process.env.UPSTASH_REDIS_REST_URL,
+        token: process.env.UPSTASH_REDIS_REST_TOKEN,
+      }),
+      prefix: 'lmha:sess:',
+    })
+  : undefined; // falls back to MemoryStore in local dev
+
 app.use(session({
+  store: sessionStore,
   secret: process.env.SESSION_SECRET || 'lmha-dev-secret-change-me',
   resave: false,
   saveUninitialized: false,
@@ -94,16 +107,21 @@ app.use((err, req, res, _next) => {
   res.status(500).json({ error: isDev ? (err.message || 'Internal server error') : 'Internal server error' });
 });
 
-// Wait for DB to be fully initialised before accepting traffic
-db.ready
-  .then(() => {
-    app.listen(PORT, () => {
-      console.log(`LMHA backend running on port ${PORT}`);
-      console.log(`Frontend: ${FRONTEND_URL}`);
-      console.log(`Protected admin email: ${PROTECTED_EMAIL || '(none set)'}`);
+// Local dev: start server normally
+// In production (Vercel), the app is exported below and serverless handles listening
+if (process.env.NODE_ENV !== 'production') {
+  db.ready
+    .then(() => {
+      app.listen(PORT, () => {
+        console.log(`LMHA backend running on port ${PORT}`);
+        console.log(`Frontend: ${FRONTEND_URL}`);
+        console.log(`Protected admin email: ${PROTECTED_EMAIL || '(none set)'}`);
+      });
+    })
+    .catch(err => {
+      console.error('[DB] Initialisation failed:', err);
+      process.exit(1);
     });
-  })
-  .catch(err => {
-    console.error('[DB] Initialisation failed:', err);
-    process.exit(1);
-  });
+}
+
+module.exports = app;

@@ -35,19 +35,13 @@ async function aggregateMetrics(location, startDate, endDate) {
 
   // --- Helpers ---
 
-  function hasSupport(booking, type) {
-    if (!booking.type_of_support) return false;
-    try {
-      const arr = JSON.parse(booking.type_of_support);
-      return Array.isArray(arr) ? arr.includes(type) : false;
-    } catch {
-      return booking.type_of_support.includes(type);
-    }
-  }
-
   function parseJson(val) {
     if (!val) return [];
     try { return JSON.parse(val); } catch { return []; }
+  }
+
+  function hasSupport(booking, type) {
+    return parseJson(booking.type_of_support).includes(type);
   }
 
   function countNeed(key) {

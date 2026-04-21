@@ -90,6 +90,10 @@ router.patch('/:id', requireAuth, async (req, res, next) => {
       'emergency_contact_phone', 'gp_name', 'gp_phone', 'repeat_user', 'first_visit_date'
     ];
 
+    if (req.body.full_name !== undefined && !req.body.full_name) {
+      return res.status(400).json({ error: 'full_name cannot be empty' });
+    }
+
     const sets = [];
     const args = [];
     for (const f of fields) {
