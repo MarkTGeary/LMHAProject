@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useAuth } from '../App'
 import Layout from '../components/Layout'
 import MetricsPreview from '../components/MetricsPreview'
+import { apiUrl } from '../lib/api'
 
 function getMondayOfWeek(d = new Date()) {
   const day = d.getDay()
@@ -28,12 +29,13 @@ export default function MetricsDashboard() {
   const [feedback, setFeedback] = useState({ thankyou_letters: 0, verbal_feedback: 0, testimonials: 0, vox_pop: 0 })
   const [feedbackSaving, setFeedbackSaving] = useState(false)
   const [feedbackSaved, setFeedbackSaved] = useState(false)
+  const [feedbackError, setFeedbackError] = useState(false)
   const [miscOpen, setMiscOpen] = useState(false)
 
   const loadFeedback = async (weekStart) => {
     try {
       const res = await fetch(
-        `/api/metrics/feedback?location=${encodeURIComponent(location)}&week_start=${weekStart}`,
+        apiUrl(`/api/metrics/feedback?location=${encodeURIComponent(location)}&week_start=${weekStart}`),
         { credentials: 'include' }
       )
       if (res.ok) {
@@ -44,17 +46,19 @@ export default function MetricsDashboard() {
   }
 
   const saveFeedback = async () => {
-    setFeedbackSaving(true); setFeedbackSaved(false)
+    setFeedbackSaving(true); setFeedbackSaved(false); setFeedbackError(false)
     try {
-      await fetch('/api/metrics/feedback', {
+      const res = await fetch(apiUrl('/api/metrics/feedback'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify({ location, week_start: currentWeekStart, ...feedback }),
       })
-      setFeedbackSaved(true)
-      setTimeout(() => setFeedbackSaved(false), 2500)
-    } catch { /* non-critical */ }
+      if (!res.ok) { setFeedbackError(true) } else {
+        setFeedbackSaved(true)
+        setTimeout(() => setFeedbackSaved(false), 2500)
+      }
+    } catch { setFeedbackError(true) }
     setFeedbackSaving(false)
   }
 
@@ -62,7 +66,7 @@ export default function MetricsDashboard() {
     setError(''); setMetrics(null); setSubmitResult(null); setLoadingSheets(true)
     try {
       const res = await fetch(
-        `/api/metrics/read?location=${encodeURIComponent(location)}&start=${start}&end=${end}`,
+        apiUrl(`/api/metrics/read?location=${encodeURIComponent(location)}&start=${start}&end=${end}`),
         { credentials: 'include' }
       )
       const data = await res.json()
@@ -81,7 +85,7 @@ export default function MetricsDashboard() {
     await loadFeedback(start)
     try {
       const res = await fetch(
-        `/api/metrics/preview?location=${encodeURIComponent(location)}&start=${start}&end=${end}`,
+        apiUrl(`/api/metrics/preview?location=${encodeURIComponent(location)}&start=${start}&end=${end}`),
         { credentials: 'include' }
       )
       const data = await res.json()
@@ -98,7 +102,7 @@ export default function MetricsDashboard() {
     if (!confirm(`Push metrics for ${location} (${start} to ${end}) to Google Sheets? This cannot be undone.`)) return
     setError(''); setSubmitting(true); setSubmitResult(null)
     try {
-      const res = await fetch('/api/metrics/submit', {
+      const res = await fetch(apiUrl('/api/metrics/submit'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -268,6 +272,7 @@ export default function MetricsDashboard() {
                   {feedbackSaving ? 'Saving…' : 'Save Feedback Counts'}
                 </button>
                 {feedbackSaved && <span className="text-green-600 text-sm font-medium">✓ Saved</span>}
+                {feedbackError && <span className="text-red-600 text-sm font-medium">Failed to save — try again</span>}
               </div>
             </div>
           )}

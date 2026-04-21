@@ -2,17 +2,19 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../App'
 import Layout from '../components/Layout'
+import { apiUrl } from '../lib/api'
 
 export default function Dashboard() {
   const { location } = useAuth()
   const [stats, setStats] = useState(null)
+  const [statsError, setStatsError] = useState(false)
   const today = new Date().toISOString().slice(0, 10)
 
   useEffect(() => {
-    // Load today's quick stats
+    setStatsError(false)
     Promise.all([
-      fetch(`/api/bookings?status=Active&location=${encodeURIComponent(location)}`, { credentials: 'include' }).then(r => r.json()),
-      fetch(`/api/bookings?today=1&location=${encodeURIComponent(location)}`, { credentials: 'include' }).then(r => r.json()),
+      fetch(apiUrl(`/api/bookings?status=Active&location=${encodeURIComponent(location)}`), { credentials: 'include' }).then(r => r.json()),
+      fetch(apiUrl(`/api/bookings?today=1&location=${encodeURIComponent(location)}`), { credentials: 'include' }).then(r => r.json()),
     ]).then(([active, todayBookings]) => {
       setStats({
         active: active.length,
@@ -20,7 +22,7 @@ export default function Dashboard() {
         todayAttended: todayBookings.filter(b => b.outcome === 'Attended').length,
         intakeMissing: active.filter(b => !b.intake_complete).length,
       })
-    }).catch(() => {})
+    }).catch(() => setStatsError(true))
   }, [location])
 
   return (
@@ -34,6 +36,12 @@ export default function Dashboard() {
           <h2 className="text-3xl font-bold">{location}</h2>
           <p className="opacity-80 mt-1">Case Management System</p>
         </div>
+
+        {statsError && (
+          <div className="bg-red-50 border-2 border-red-300 rounded-xl p-3 text-red-700 text-sm font-semibold">
+            Could not load stats — check your connection and refresh.
+          </div>
+        )}
 
         {/* Quick stats */}
         {stats && (

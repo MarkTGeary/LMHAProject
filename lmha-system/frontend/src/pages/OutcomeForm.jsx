@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import Layout from '../components/Layout'
+import { apiUrl } from '../lib/api'
+import { LOCK_DAYS } from '../lib/constants'
 
 const SUPPORT_TYPES = [
   { code: 'SS', label: 'Social Support' },
@@ -32,12 +34,12 @@ export default function OutcomeForm() {
   })
 
   useEffect(() => {
-    fetch(`/api/bookings/${id}`, { credentials: 'include' })
+    fetch(apiUrl(`/api/bookings/${id}`), { credentials: 'include' })
       .then(r => r.json())
       .then(b => {
         setBooking(b)
         const cutoff = new Date()
-        cutoff.setDate(cutoff.getDate() - 21)
+        cutoff.setDate(cutoff.getDate() - LOCK_DAYS)
         cutoff.setHours(0, 0, 0, 0)
         setIsLocked(new Date(b.date) < cutoff)
         setForm({
@@ -72,7 +74,7 @@ export default function OutcomeForm() {
     setError(''); setSaving(true)
 
     try {
-      const res = await fetch(`/api/bookings/${id}`, {
+      const res = await fetch(apiUrl(`/api/bookings/${id}`), {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -107,7 +109,7 @@ export default function OutcomeForm() {
     setError(''); setSaving(true)
 
     try {
-      const res = await fetch(`/api/bookings/${id}`, {
+      const res = await fetch(apiUrl(`/api/bookings/${id}`), {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',

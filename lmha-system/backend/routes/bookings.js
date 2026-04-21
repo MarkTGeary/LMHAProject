@@ -2,27 +2,21 @@ const express = require('express');
 const router = express.Router();
 const db = require('../db');
 const { requireAuth } = require('../middleware/requireAuth');
+const { LOCATION_RULES, LOCK_DAYS } = require('../lib/constants');
 
-// Booking hours validation
-const LOCATION_RULES = {
-  'LMHA': {
-    days: [1, 2, 3, 4, 5], // Mon-Fri
-    startHour: 11,
-    endHour: 17,
-  },
-  'Solace Café': {
-    days: [4, 5, 6, 0], // Thu-Sun
-    startHour: 18,
-    endHour: 24,
-  },
-};
-
-function validateBookingTime(location, dateStr, timeStr) {
+function validateBookingTime(location, dateStr, timeStr, allowPast = false) {
   const rules = LOCATION_RULES[location];
   if (!rules) return { valid: false, error: 'Unknown location' };
 
-  const date = new Date(dateStr);
-  const dayOfWeek = date.getDay(); // 0=Sun, 1=Mon, ...
+  const date = new Date(dateStr + 'T12:00:00');
+
+  if (!allowPast) {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    if (date < today) return { valid: false, error: 'Booking date cannot be in the past' };
+  }
+
+  const dayOfWeek = date.getDay();
 
   if (!rules.days.includes(dayOfWeek)) {
     return { valid: false, error: `${location} is not open on this day` };
@@ -31,7 +25,6 @@ function validateBookingTime(location, dateStr, timeStr) {
   const [hours, minutes] = timeStr.split(':').map(Number);
   const totalMins = hours * 60 + minutes;
   const openMins = rules.startHour * 60;
-  // Last appointment must end before close — so latest start is endHour-1hr
   const latestStartMins = (rules.endHour - 1) * 60;
 
   if (totalMins < openMins || totalMins > latestStartMins) {
@@ -45,24 +38,23 @@ function validateBookingTime(location, dateStr, timeStr) {
   return { valid: true };
 }
 
-function checkDoubleBooking(location, dateStr, timeStr, excludeId = null) {
-  // Find bookings within ±60 mins at same location/date
+async function checkDoubleBooking(location, dateStr, timeStr, excludeId = null) {
   const [hours, minutes] = timeStr.split(':').map(Number);
   const newMins = hours * 60 + minutes;
 
-  const params = excludeId ? [location, dateStr, excludeId] : [location, dateStr];
-  const existing = db.prepare(
-    `SELECT id, time_booked, service_user_id,
-            (SELECT full_name FROM service_users WHERE id = bookings.service_user_id) as name
-     FROM bookings
-     WHERE location = ? AND date = ? AND status != 'Cancelled'
-     ${excludeId ? 'AND id != ?' : ''}`
-  ).all(...params);
+  const result = await db.execute({
+    sql: `SELECT b.id, b.time_booked, b.service_user_id,
+                 su.full_name as name
+          FROM bookings b
+          LEFT JOIN service_users su ON su.id = b.service_user_id
+          WHERE b.location = ? AND b.date = ? AND b.status != 'Cancelled'
+          ${excludeId ? 'AND b.id != ?' : ''}`,
+    args: excludeId ? [location, dateStr, excludeId] : [location, dateStr],
+  });
 
-  for (const b of existing) {
+  for (const b of result.rows) {
     const [bh, bm] = b.time_booked.split(':').map(Number);
     const bMins = bh * 60 + bm;
-    // Two 1-hour appointments conflict if they start within 60 mins of each other
     if (Math.abs(newMins - bMins) < 60) {
       return {
         conflict: true,
@@ -75,278 +67,278 @@ function checkDoubleBooking(location, dateStr, timeStr, excludeId = null) {
 }
 
 // GET /api/bookings — list with filters
-router.get('/', requireAuth, (req, res) => {
-  const { status, location, date, today, this_week, intake_status, start_date, end_date, service_user_id, search } = req.query;
+router.get('/', requireAuth, async (req, res, next) => {
+  try {
+    const { status, location, date, today, this_week, intake_status, start_date, end_date, service_user_id, search } = req.query;
 
-  let query = `
-    SELECT b.*,
-           su.full_name,
-           su.phone,
-           CASE WHEN i.id IS NOT NULL THEN 1 ELSE 0 END as intake_complete
-    FROM bookings b
-    LEFT JOIN service_users su ON b.service_user_id = su.id
-    LEFT JOIN intake_forms i ON i.booking_id = b.id
-    WHERE 1=1
-  `;
-  const params = [];
+    let sql = `
+      SELECT b.*,
+             su.full_name,
+             su.phone,
+             CASE WHEN i.id IS NOT NULL THEN 1 ELSE 0 END as intake_complete
+      FROM bookings b
+      LEFT JOIN service_users su ON b.service_user_id = su.id
+      LEFT JOIN intake_forms i ON i.booking_id = b.id
+      WHERE 1=1
+    `;
+    const args = [];
 
-  if (status) { query += ' AND b.status = ?'; params.push(status); }
-  if (location) { query += ' AND b.location = ?'; params.push(location); }
-  if (date) { query += ' AND b.date = ?'; params.push(date); }
-  if (today) {
-    const todayStr = new Date().toISOString().slice(0, 10);
-    query += ' AND b.date = ?'; params.push(todayStr);
-  }
-  if (this_week) {
-    const now = new Date();
-    const mon = new Date(now);
-    mon.setDate(now.getDate() - now.getDay() + 1);
-    const sun = new Date(mon);
-    sun.setDate(mon.getDate() + 6);
-    query += ' AND b.date BETWEEN ? AND ?';
-    params.push(mon.toISOString().slice(0, 10), sun.toISOString().slice(0, 10));
-  }
-  if (start_date && end_date) {
-    query += ' AND b.date BETWEEN ? AND ?'; params.push(start_date, end_date);
-  }
-  if (intake_status === 'missing') {
-    query += ' AND i.id IS NULL';
-  } else if (intake_status === 'complete') {
-    query += ' AND i.id IS NOT NULL';
-  }
-  if (service_user_id) { query += ' AND b.service_user_id = ?'; params.push(service_user_id); }
-  if (search) {
-    const like = '%' + search.trim() + '%';
-    query += ' AND (su.full_name LIKE ? OR su.phone LIKE ?)';
-    params.push(like, like);
-  }
+    if (status)   { sql += ' AND b.status = ?';   args.push(status); }
+    if (location) { sql += ' AND b.location = ?'; args.push(location); }
+    if (date)     { sql += ' AND b.date = ?';     args.push(date); }
+    if (today) {
+      const todayStr = new Date().toISOString().slice(0, 10);
+      sql += ' AND b.date = ?'; args.push(todayStr);
+    }
+    if (this_week) {
+      const now = new Date();
+      const mon = new Date(now);
+      mon.setDate(now.getDate() - now.getDay() + 1);
+      const sun = new Date(mon);
+      sun.setDate(mon.getDate() + 6);
+      sql += ' AND b.date BETWEEN ? AND ?';
+      args.push(mon.toISOString().slice(0, 10), sun.toISOString().slice(0, 10));
+    }
+    if (start_date && end_date) {
+      sql += ' AND b.date BETWEEN ? AND ?'; args.push(start_date, end_date);
+    }
+    if (intake_status === 'missing') {
+      sql += ' AND i.id IS NULL';
+    } else if (intake_status === 'complete') {
+      sql += ' AND i.id IS NOT NULL';
+    }
+    if (service_user_id) { sql += ' AND b.service_user_id = ?'; args.push(service_user_id); }
+    if (search) {
+      const like = '%' + search.trim() + '%';
+      sql += ' AND (su.full_name LIKE ? OR su.phone LIKE ?)';
+      args.push(like, like);
+    }
 
-  const order = service_user_id ? 'DESC' : 'ASC';
-  query += ` ORDER BY b.date ${order}, b.time_booked ${order}`;
+    const order = service_user_id ? 'DESC' : 'ASC';
+    sql += ` ORDER BY b.date ${order}, b.time_booked ${order}`;
 
-  const rows = db.prepare(query).all(...params);
-  res.json(rows);
+    const result = await db.execute({ sql, args });
+    res.json(result.rows);
+  } catch (err) { next(err); }
 });
 
-// GET /api/bookings/schedule?date=&location= — daily schedule
-router.get('/schedule', requireAuth, (req, res) => {
-  const { date, location } = req.query;
-  if (!date || !location) return res.status(400).json({ error: 'date and location required' });
+// GET /api/bookings/available-slots?date=&location=
+router.get('/available-slots', requireAuth, async (req, res, next) => {
+  try {
+    const { date, location } = req.query;
+    if (!date || !location) return res.status(400).json({ error: 'date and location required' });
 
-  const rows = db.prepare(`
-    SELECT b.*,
-           su.full_name, su.phone,
-           CASE WHEN i.id IS NOT NULL THEN 1 ELSE 0 END as intake_complete
-    FROM bookings b
-    LEFT JOIN service_users su ON b.service_user_id = su.id
-    LEFT JOIN intake_forms i ON i.booking_id = b.id
-    WHERE b.date = ? AND b.location = ? AND b.status != 'Cancelled'
-    ORDER BY b.time_booked ASC
-  `).all(date, location);
-  res.json(rows);
-});
+    const rules = LOCATION_RULES[location];
+    if (!rules) return res.status(400).json({ error: 'Unknown location' });
 
-// GET /api/bookings/available-slots?date=&location= — available time slots
-router.get('/available-slots', requireAuth, (req, res) => {
-  const { date, location } = req.query;
-  if (!date || !location) return res.status(400).json({ error: 'date and location required' });
+    const d = new Date(date);
+    const dayOfWeek = d.getDay();
 
-  const rules = LOCATION_RULES[location];
-  if (!rules) return res.status(400).json({ error: 'Unknown location' });
+    if (!rules.days.includes(dayOfWeek)) {
+      return res.json({ available: false, reason: `${location} is closed on this day`, slots: [] });
+    }
 
-  const d = new Date(date);
-  const dayOfWeek = d.getDay();
+    const result = await db.execute({
+      sql: `SELECT time_booked FROM bookings WHERE location = ? AND date = ? AND status != 'Cancelled'`,
+      args: [location, date],
+    });
 
-  if (!rules.days.includes(dayOfWeek)) {
-    return res.json({ available: false, reason: `${location} is closed on this day`, slots: [] });
-  }
+    const bookedMins = result.rows.map(b => {
+      const [h, m] = b.time_booked.split(':').map(Number);
+      return h * 60 + m;
+    });
 
-  const existing = db.prepare(
-    `SELECT time_booked FROM bookings WHERE location = ? AND date = ? AND status != 'Cancelled'`
-  ).all(location, date);
+    const slots = [];
+    for (let mins = rules.startHour * 60; mins <= (rules.endHour - 1) * 60; mins += 30) {
+      const isBooked = bookedMins.some(bm => Math.abs(bm - mins) < 60);
+      const h = Math.floor(mins / 60).toString().padStart(2, '0');
+      const m = (mins % 60).toString().padStart(2, '0');
+      slots.push({ time: `${h}:${m}`, available: !isBooked });
+    }
 
-  const bookedMins = existing.map(b => {
-    const [h, m] = b.time_booked.split(':').map(Number);
-    return h * 60 + m;
-  });
-
-  const slots = [];
-  for (let mins = rules.startHour * 60; mins <= (rules.endHour - 1) * 60; mins += 30) {
-    const isBooked = bookedMins.some(bm => Math.abs(bm - mins) < 60);
-    const h = Math.floor(mins / 60).toString().padStart(2, '0');
-    const m = (mins % 60).toString().padStart(2, '0');
-    slots.push({ time: `${h}:${m}`, available: !isBooked });
-  }
-
-  res.json({ available: true, slots });
+    res.json({ available: true, slots });
+  } catch (err) { next(err); }
 });
 
 // GET /api/bookings/:id
-router.get('/:id', requireAuth, (req, res) => {
-  const row = db.prepare(`
-    SELECT b.*,
-           su.full_name, su.phone, su.email, su.age_group, su.gender,
-           CASE WHEN i.id IS NOT NULL THEN 1 ELSE 0 END as intake_complete
-    FROM bookings b
-    LEFT JOIN service_users su ON b.service_user_id = su.id
-    LEFT JOIN intake_forms i ON i.booking_id = b.id
-    WHERE b.id = ?
-  `).get(req.params.id);
-  if (!row) return res.status(404).json({ error: 'Not found' });
-  res.json(row);
+router.get('/:id', requireAuth, async (req, res, next) => {
+  try {
+    const result = await db.execute({
+      sql: `SELECT b.*,
+                   su.full_name, su.phone, su.email, su.age_group, su.gender,
+                   CASE WHEN i.id IS NOT NULL THEN 1 ELSE 0 END as intake_complete
+            FROM bookings b
+            LEFT JOIN service_users su ON b.service_user_id = su.id
+            LEFT JOIN intake_forms i ON i.booking_id = b.id
+            WHERE b.id = ?`,
+      args: [req.params.id],
+    });
+    if (!result.rows.length) return res.status(404).json({ error: 'Not found' });
+    res.json(result.rows[0]);
+  } catch (err) { next(err); }
 });
 
 // POST /api/bookings — create
-router.post('/', requireAuth, (req, res) => {
-  const {
-    service_user_id, location, date, time_booked, interaction_type,
-    new_or_repeat, referred_from, type_of_support, carer_attended,
-    peer_support_worker, limitations, notes,
-    // service user creation fields (if new user on walk-in)
-    full_name, phone,
-  } = req.body;
-
-  if (!location || !date || !time_booked || !interaction_type) {
-    return res.status(400).json({ error: 'location, date, time_booked, and interaction_type are required' });
-  }
-
-  if (location !== req.session.location) {
-    return res.status(403).json({ error: 'Location does not match your current session' });
-  }
-
-  // Validate time format HH:MM
-  if (!/^\d{2}:\d{2}$/.test(time_booked)) {
-    return res.status(400).json({ error: 'Invalid time format' });
-  }
-
-  // Validate type_of_support if provided
-  const VALID_SUPPORT_TYPES = ['SS', 'PS', 'C', 'O', 'SP'];
-  if (type_of_support !== undefined && type_of_support !== null) {
-    if (!Array.isArray(type_of_support) || !type_of_support.every(t => VALID_SUPPORT_TYPES.includes(t))) {
-      return res.status(400).json({ error: 'Invalid type_of_support values' });
-    }
-  }
-
-  // Validate location hours
-  const timeValid = validateBookingTime(location, date, time_booked);
-  if (!timeValid.valid) return res.status(400).json({ error: timeValid.error });
-
-  // Check double booking
-  const conflict = checkDoubleBooking(location, date, time_booked);
-  if (conflict.conflict) return res.status(409).json({ error: conflict.message });
-
-  let userId = service_user_id;
-
-  // If no service_user_id but name provided, create minimal user
-  if (!userId && full_name) {
-    const result = db.prepare(
-      `INSERT INTO service_users (full_name, phone, repeat_user, first_visit_date)
-       VALUES (?, ?, 0, ?)`
-    ).run(full_name, phone || null, date);
-    userId = result.lastInsertRowid;
-  }
-
-  const result = db.prepare(`
-    INSERT INTO bookings (
+router.post('/', requireAuth, async (req, res, next) => {
+  try {
+    const {
       service_user_id, location, date, time_booked, interaction_type,
       new_or_repeat, referred_from, type_of_support, carer_attended,
-      peer_support_worker, limitations, notes, outcome, status, created_by
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Pending', 'Active', ?)
-  `).run(
-    userId || null, location, date, time_booked, interaction_type,
-    new_or_repeat || null, referred_from || null,
-    type_of_support ? JSON.stringify(type_of_support) : null,
-    carer_attended ? 1 : 0,
-    peer_support_worker || null, limitations || null, notes || null,
-    req.user.email
-  );
+      peer_support_worker, limitations, notes,
+      full_name, phone,
+    } = req.body;
 
-  const booking = db.prepare('SELECT * FROM bookings WHERE id = ?').get(result.lastInsertRowid);
-  res.status(201).json(booking);
+    if (!location || !date || !time_booked || !interaction_type) {
+      return res.status(400).json({ error: 'location, date, time_booked, and interaction_type are required' });
+    }
+
+    if (location !== req.session.location) {
+      return res.status(403).json({ error: 'Location does not match your current session' });
+    }
+
+    if (!/^\d{2}:\d{2}$/.test(time_booked)) {
+      return res.status(400).json({ error: 'Invalid time format' });
+    }
+
+    const VALID_SUPPORT_TYPES = ['SS', 'PS', 'C', 'O', 'SP'];
+    if (type_of_support !== undefined && type_of_support !== null) {
+      if (!Array.isArray(type_of_support) || !type_of_support.every(t => VALID_SUPPORT_TYPES.includes(t))) {
+        return res.status(400).json({ error: 'Invalid type_of_support values' });
+      }
+    }
+
+    const timeValid = validateBookingTime(location, date, time_booked);
+    if (!timeValid.valid) return res.status(400).json({ error: timeValid.error });
+
+    const conflict = await checkDoubleBooking(location, date, time_booked);
+    if (conflict.conflict) return res.status(409).json({ error: conflict.message });
+
+    let userId = service_user_id;
+
+    if (!userId && full_name) {
+      const suResult = await db.execute({
+        sql: `INSERT INTO service_users (full_name, phone, repeat_user, first_visit_date) VALUES (?, ?, 0, ?)`,
+        args: [full_name, phone || null, date],
+      });
+      userId = Number(suResult.lastInsertRowid);
+    }
+
+    const bResult = await db.execute({
+      sql: `INSERT INTO bookings (
+              service_user_id, location, date, time_booked, interaction_type,
+              new_or_repeat, referred_from, type_of_support, carer_attended,
+              peer_support_worker, limitations, notes, outcome, status, created_by
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Pending', 'Active', ?)`,
+      args: [
+        userId || null, location, date, time_booked, interaction_type,
+        new_or_repeat || null, referred_from || null,
+        type_of_support ? JSON.stringify(type_of_support) : null,
+        carer_attended ? 1 : 0,
+        peer_support_worker || null, limitations || null, notes || null,
+        req.user.email,
+      ],
+    });
+
+    const booking = await db.execute({
+      sql: 'SELECT * FROM bookings WHERE id = ?',
+      args: [Number(bResult.lastInsertRowid)],
+    });
+    res.status(201).json(booking.rows[0]);
+  } catch (err) { next(err); }
 });
 
 // PATCH /api/bookings/:id — update
-router.patch('/:id', requireAuth, (req, res) => {
-  const existing = db.prepare('SELECT * FROM bookings WHERE id = ?').get(req.params.id);
-  if (!existing) return res.status(404).json({ error: 'Not found' });
+router.patch('/:id', requireAuth, async (req, res, next) => {
+  try {
+    const existingResult = await db.execute({
+      sql: 'SELECT * FROM bookings WHERE id = ?',
+      args: [req.params.id],
+    });
+    if (!existingResult.rows.length) return res.status(404).json({ error: 'Not found' });
+    const existing = existingResult.rows[0];
 
-  // 3-week lock — bookings older than 21 days cannot be edited
-  const cutoff = new Date();
-  cutoff.setDate(cutoff.getDate() - 21);
-  cutoff.setHours(0, 0, 0, 0);
-  if (new Date(existing.date) < cutoff) {
-    return res.status(403).json({ error: 'This record is locked — bookings older than 3 weeks cannot be edited' });
-  }
-
-  const {
-    date, time_booked, location, interaction_type, new_or_repeat, referred_from,
-    type_of_support, carer_attended, peer_support_worker, limitations, notes,
-    time_in, time_out, outcome, status, ed_diversion, service_user_id
-  } = req.body;
-
-  const newDate = date || existing.date;
-  const newTime = time_booked || existing.time_booked;
-  const newLocation = location || existing.location;
-
-  // Re-validate if time/date/location changed
-  if (date || time_booked || location) {
-    const timeValid = validateBookingTime(newLocation, newDate, newTime);
-    if (!timeValid.valid) return res.status(400).json({ error: timeValid.error });
-
-    const conflict = checkDoubleBooking(newLocation, newDate, newTime, parseInt(req.params.id));
-    if (conflict.conflict) return res.status(409).json({ error: conflict.message });
-  }
-
-  // Validate close requirements
-  if (status === 'Closed') {
-    const intake = db.prepare('SELECT id FROM intake_forms WHERE booking_id = ?').get(req.params.id);
-    if (!intake) return res.status(400).json({ error: 'Cannot close: intake form not completed' });
-
-    const targetOutcome = outcome || existing.outcome;
-    if (!targetOutcome || targetOutcome === 'Pending') {
-      return res.status(400).json({ error: 'Cannot close: outcome must be set (Attended or Did Not Attend)' });
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - LOCK_DAYS);
+    cutoff.setHours(0, 0, 0, 0);
+    if (new Date(existing.date) < cutoff) {
+      return res.status(403).json({ error: 'This record is locked — bookings older than 3 weeks cannot be edited' });
     }
-    const targetSupport = type_of_support || existing.type_of_support;
-    if (!targetSupport) {
-      return res.status(400).json({ error: 'Cannot close: type of support must be selected' });
+
+    const {
+      date, time_booked, location, interaction_type, new_or_repeat, referred_from,
+      type_of_support, carer_attended, peer_support_worker, limitations, notes,
+      time_in, time_out, outcome, status, ed_diversion, service_user_id
+    } = req.body;
+
+    const newDate     = date     || existing.date;
+    const newTime     = time_booked || existing.time_booked;
+    const newLocation = location || existing.location;
+
+    if (date || time_booked || location) {
+      const timeValid = validateBookingTime(newLocation, newDate, newTime, true);
+      if (!timeValid.valid) return res.status(400).json({ error: timeValid.error });
+
+      const conflict = await checkDoubleBooking(newLocation, newDate, newTime, parseInt(req.params.id));
+      if (conflict.conflict) return res.status(409).json({ error: conflict.message });
     }
-  }
 
-  db.prepare(`
-    UPDATE bookings SET
-      date = COALESCE(?, date),
-      time_booked = COALESCE(?, time_booked),
-      location = COALESCE(?, location),
-      interaction_type = COALESCE(?, interaction_type),
-      new_or_repeat = COALESCE(?, new_or_repeat),
-      referred_from = COALESCE(?, referred_from),
-      type_of_support = COALESCE(?, type_of_support),
-      carer_attended = COALESCE(?, carer_attended),
-      peer_support_worker = COALESCE(?, peer_support_worker),
-      limitations = COALESCE(?, limitations),
-      notes = COALESCE(?, notes),
-      time_in = COALESCE(?, time_in),
-      time_out = COALESCE(?, time_out),
-      outcome = COALESCE(?, outcome),
-      status = COALESCE(?, status),
-      ed_diversion = COALESCE(?, ed_diversion),
-      service_user_id = COALESCE(?, service_user_id),
-      updated_at = datetime('now')
-    WHERE id = ?
-  `).run(
-    date || null, time_booked || null, location || null, interaction_type || null,
-    new_or_repeat || null, referred_from || null,
-    type_of_support !== undefined ? JSON.stringify(type_of_support) : null,
-    carer_attended !== undefined ? (carer_attended ? 1 : 0) : null,
-    peer_support_worker || null, limitations || null, notes || null,
-    time_in || null, time_out || null, outcome || null, status || null,
-    ed_diversion !== undefined ? ed_diversion : null,
-    service_user_id || null,
-    req.params.id
-  );
+    if (status === 'Closed') {
+      const intakeResult = await db.execute({
+        sql: 'SELECT id FROM intake_forms WHERE booking_id = ?',
+        args: [req.params.id],
+      });
+      if (!intakeResult.rows.length) return res.status(400).json({ error: 'Cannot close: intake form not completed' });
 
-  const updated = db.prepare('SELECT * FROM bookings WHERE id = ?').get(req.params.id);
-  res.json(updated);
+      const targetOutcome = outcome || existing.outcome;
+      if (!targetOutcome || targetOutcome === 'Pending') {
+        return res.status(400).json({ error: 'Cannot close: outcome must be set (Attended or Did Not Attend)' });
+      }
+      const targetSupport = type_of_support || existing.type_of_support;
+      if (!targetSupport) {
+        return res.status(400).json({ error: 'Cannot close: type of support must be selected' });
+      }
+    }
+
+    await db.execute({
+      sql: `UPDATE bookings SET
+              date              = COALESCE(?, date),
+              time_booked       = COALESCE(?, time_booked),
+              location          = COALESCE(?, location),
+              interaction_type  = COALESCE(?, interaction_type),
+              new_or_repeat     = COALESCE(?, new_or_repeat),
+              referred_from     = COALESCE(?, referred_from),
+              type_of_support   = COALESCE(?, type_of_support),
+              carer_attended    = COALESCE(?, carer_attended),
+              peer_support_worker = COALESCE(?, peer_support_worker),
+              limitations       = COALESCE(?, limitations),
+              notes             = COALESCE(?, notes),
+              time_in           = COALESCE(?, time_in),
+              time_out          = COALESCE(?, time_out),
+              outcome           = COALESCE(?, outcome),
+              status            = COALESCE(?, status),
+              ed_diversion      = COALESCE(?, ed_diversion),
+              service_user_id   = COALESCE(?, service_user_id),
+              updated_at        = datetime('now')
+            WHERE id = ?`,
+      args: [
+        date || null, time_booked || null, location || null, interaction_type || null,
+        new_or_repeat || null, referred_from || null,
+        type_of_support !== undefined ? JSON.stringify(type_of_support) : null,
+        carer_attended !== undefined ? (carer_attended ? 1 : 0) : null,
+        peer_support_worker || null, limitations || null, notes || null,
+        time_in || null, time_out || null, outcome || null, status || null,
+        ed_diversion !== undefined ? ed_diversion : null,
+        service_user_id || null,
+        req.params.id,
+      ],
+    });
+
+    const updated = await db.execute({
+      sql: 'SELECT * FROM bookings WHERE id = ?',
+      args: [req.params.id],
+    });
+    res.json(updated.rows[0]);
+  } catch (err) { next(err); }
 });
 
 module.exports = router;

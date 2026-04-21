@@ -2,6 +2,8 @@ const express = require('express');
 const passport = require('passport');
 const router = express.Router();
 
+const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
+
 // Kick off Google login, store location in session for after callback
 router.get('/google', (req, res, next) => {
   if (req.query.location) {
@@ -13,20 +15,18 @@ router.get('/google', (req, res, next) => {
 // Google redirects back here
 router.get('/google/callback',
   passport.authenticate('google', {
-    failureRedirect: 'http://localhost:5173/login?error=unauthorized',
+    failureRedirect: `${FRONTEND_URL}/login?error=unauthorized`,
   }),
   (req, res) => {
     const location = req.session.pendingLocation;
     delete req.session.pendingLocation;
 
     if (location) {
-      // They came from location select — send them to the app with location set
       req.session.location = location;
-      return res.redirect('http://localhost:5173/');
+      return res.redirect(`${FRONTEND_URL}/`);
     }
 
-    // Normal login flow — send to location select first
-    res.redirect('http://localhost:5173/location');
+    res.redirect(`${FRONTEND_URL}/location`);
   }
 );
 
@@ -54,7 +54,7 @@ router.post('/location', (req, res) => {
 });
 
 router.get('/logout', (req, res) => {
-  req.logout(() => res.redirect('http://localhost:5173'));
+  req.logout(() => res.redirect(FRONTEND_URL));
 });
 
 module.exports = router;
