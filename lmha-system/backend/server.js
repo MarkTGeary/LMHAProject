@@ -5,7 +5,7 @@ const passport = require('passport');
 const GoogleStrategy = require('passport-google-oauth20').Strategy;
 const cors = require('cors');
 const { Redis } = require('@upstash/redis');
-const RedisStore = require('connect-redis').default;
+const { RedisStore } = require('connect-redis');
 
 const db = require('./db');
 
@@ -87,6 +87,11 @@ passport.use(new GoogleStrategy(
 
 passport.serializeUser((user, done) => done(null, user));
 passport.deserializeUser((user, done) => done(null, user));
+
+// Ensure DB is initialised before any request is handled (important in serverless)
+app.use(async (_req, _res, next) => {
+  try { await db.ready; next(); } catch (err) { next(err); }
+});
 
 // Routes
 app.use('/auth', require('./routes/auth'));
