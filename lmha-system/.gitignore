@@ -16,6 +16,7 @@ backend/sessions/
 # Secrets
 backend/.env
 backend/.env.*
+!.example
 backend/service-account-key.json
 
 # Build output
