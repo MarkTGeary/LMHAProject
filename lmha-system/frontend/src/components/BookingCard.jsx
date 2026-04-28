@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { apiUrl } from '../lib/api'
+import { apiFetch } from '../lib/api'
 
 const OUTCOME_BADGE = {
   'Attended': 'badge-attended',
@@ -23,10 +23,9 @@ export default function BookingCard({ booking, onRefresh }) {
 
   const cancel = async () => {
     if (!confirm('Mark this booking as Cancelled? It will remain in the database.')) return
-    await fetch(apiUrl(`/api/bookings/${booking.id}`), {
+    await apiFetch(`/api/bookings/${booking.id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
       body: JSON.stringify({ status: 'Cancelled' }),
     })
     if (onRefresh) onRefresh()

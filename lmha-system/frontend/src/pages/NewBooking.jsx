@@ -3,7 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { useAuth } from '../App'
 import Layout from '../components/Layout'
 import RepeatUserSearch from '../components/RepeatUserSearch'
-import { apiUrl } from '../lib/api'
+import { apiFetch } from '../lib/api'
 import { LOCATION_RULES, LOCK_DAYS } from '../lib/constants'
 
 const INTERACTION_TYPES = [
@@ -53,7 +53,7 @@ export default function NewBooking({ editMode }) {
   // Load booking for edit mode
   useEffect(() => {
     if (editMode && id) {
-      fetch(apiUrl(`/api/bookings/${id}`), { credentials: 'include' })
+      apiFetch(`/api/bookings/${id}`)
         .then(r => r.json())
         .then(b => {
           const cutoff = new Date()
@@ -84,7 +84,7 @@ export default function NewBooking({ editMode }) {
     if (!isDayValid(form.date, form.location)) { setSlots([]); return }
 
     setSlotsLoading(true)
-    fetch(apiUrl(`/api/bookings/available-slots?date=${form.date}&location=${encodeURIComponent(form.location)}`), { credentials: 'include' })
+    apiFetch(`/api/bookings/available-slots?date=${form.date}&location=${encodeURIComponent(form.location)}`)
       .then(r => r.json())
       .then(data => {
         setSlots(data.slots || [])
@@ -130,12 +130,11 @@ export default function NewBooking({ editMode }) {
     setSaving(true)
 
     try {
-      const url = apiUrl(editMode ? `/api/bookings/${id}` : '/api/bookings')
+      const path = editMode ? `/api/bookings/${id}` : '/api/bookings'
       const method = editMode ? 'PATCH' : 'POST'
-      const res = await fetch(url, {
+      const res = await apiFetch(path, {
         method,
         headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
         body: JSON.stringify(form),
       })
       const data = await res.json()

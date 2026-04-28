@@ -1,6 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { createContext, useContext, useState, useEffect } from 'react'
-import { apiUrl } from './lib/api'
+import { apiFetch } from './lib/api'
 import Login from './pages/Login'
 import LocationSelect from './pages/LocationSelect'
 import Dashboard from './pages/Dashboard'
@@ -39,20 +39,30 @@ export default function App() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    fetch(apiUrl('/auth/me'), { credentials: 'include' })
+    // Capture token from URL after OAuth redirect
+    const params = new URLSearchParams(window.location.search)
+    const urlToken = params.get('token')
+    if (urlToken) {
+      localStorage.setItem('lmha_token', urlToken)
+      window.history.replaceState({}, '', window.location.pathname)
+    }
+
+    // Restore location from localStorage
+    const storedLocation = localStorage.getItem('lmha_location')
+    if (storedLocation) setLocation(storedLocation)
+
+    apiFetch('/auth/me')
       .then(r => r.json())
       .then(data => {
-        if (data.email) {
-          setUser(data)
-          if (data.location) setLocation(data.location)
-        }
+        if (data.email) setUser(data)
       })
       .catch(() => {})
       .finally(() => setLoading(false))
   }, [])
 
-  const logout = async () => {
-    await fetch(apiUrl('/auth/logout'), { credentials: 'include' })
+  const logout = () => {
+    localStorage.removeItem('lmha_token')
+    localStorage.removeItem('lmha_location')
     setUser(null)
     setLocation(null)
   }

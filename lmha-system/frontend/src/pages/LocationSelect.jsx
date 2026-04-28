@@ -1,22 +1,13 @@
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../App'
-import { apiUrl } from '../lib/api'
+import { apiFetch } from '../lib/api'
 
 export default function LocationSelect() {
   const { user, logout, setLocation } = useAuth()
   const navigate = useNavigate()
 
-  const select = async (loc) => {
-    try {
-      await fetch(apiUrl('/auth/location'), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ location: loc }),
-      })
-    } catch (e) {
-      // session save failed server-side, but location is still set in memory
-    }
+  const select = (loc) => {
+    localStorage.setItem('lmha_location', loc)
     setLocation(loc)
     navigate('/')
   }

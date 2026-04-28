@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { useAuth } from '../App'
 import Layout from '../components/Layout'
 import { LOCATION_RULES } from '../lib/constants'
+import { apiFetch } from '../lib/api'
 const DAY_NAMES = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat']
 const DAY_FULL  = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday']
 
@@ -49,9 +50,8 @@ export default function WeeklySchedule() {
     setLoading(true)
     const start = fmt(weekStart)
     const end   = fmt(new Date(weekStart.getTime() + 6 * 86400000))
-    fetch(
-      '/api/bookings?location=' + encodeURIComponent(location) + '&start_date=' + start + '&end_date=' + end,
-      { credentials: 'include' }
+    apiFetch(
+      '/api/bookings?location=' + encodeURIComponent(location) + '&start_date=' + start + '&end_date=' + end
     )
       .then(r => r.json())
       .then(data => { setBookings(Array.isArray(data) ? data : []); setLoading(false) })

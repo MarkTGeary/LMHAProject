@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { useAuth } from '../App'
 import Layout from '../components/Layout'
 import RepeatUserSearch from '../components/RepeatUserSearch'
-import { apiUrl } from '../lib/api'
+import { apiFetch } from '../lib/api'
 
 const REFERRAL_SOURCES = [
   'Self-referral',
@@ -224,8 +224,8 @@ export default function IntakeForm() {
 
   useEffect(() => {
     Promise.all([
-      fetch(apiUrl(`/api/bookings/${bookingId}`), { credentials: 'include' }).then(r => r.json()),
-      fetch(apiUrl(`/api/intake-forms/booking/${bookingId}`), { credentials: 'include' })
+      apiFetch(`/api/bookings/${bookingId}`).then(r => r.json()),
+      apiFetch(`/api/intake-forms/booking/${bookingId}`)
         .then(r => r.ok ? r.json() : null).catch(() => null),
     ]).then(([b, intake]) => {
       setBooking(b)
@@ -261,7 +261,7 @@ export default function IntakeForm() {
   // Load service user data if booking has one
   useEffect(() => {
     if (booking?.service_user_id) {
-      fetch(apiUrl(`/api/service-users/${booking.service_user_id}`), { credentials: 'include' })
+      apiFetch(`/api/service-users/${booking.service_user_id}`)
         .then(r => r.json())
         .then(data => {
           setSu(prev => ({
@@ -327,10 +327,9 @@ export default function IntakeForm() {
     }
 
     try {
-      const res = await fetch(apiUrl('/api/intake-forms'), {
+      const res = await apiFetch('/api/intake-forms', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
         body: JSON.stringify(payload),
       })
       const data = await res.json()

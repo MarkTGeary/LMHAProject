@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../App'
 import Layout from '../components/Layout'
-import { apiUrl } from '../lib/api'
+import { apiFetch } from '../lib/api'
 
 export default function Dashboard() {
   const { location } = useAuth()
@@ -13,8 +13,8 @@ export default function Dashboard() {
   useEffect(() => {
     setStatsError(false)
     Promise.all([
-      fetch(apiUrl(`/api/bookings?status=Active&location=${encodeURIComponent(location)}`), { credentials: 'include' }).then(r => r.json()),
-      fetch(apiUrl(`/api/bookings?today=1&location=${encodeURIComponent(location)}`), { credentials: 'include' }).then(r => r.json()),
+      apiFetch(`/api/bookings?status=Active&location=${encodeURIComponent(location)}`).then(r => r.json()),
+      apiFetch(`/api/bookings?today=1&location=${encodeURIComponent(location)}`).then(r => r.json()),
     ]).then(([active, todayBookings]) => {
       setStats({
         active: active.length,

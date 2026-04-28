@@ -103,7 +103,15 @@ app.use('/api/intake-forms',  requireLocation, require('./routes/intakeForms'));
 app.use('/api/metrics',       requireLocation, require('./routes/metrics'));
 
 // Health check
-app.get('/api/health', (req, res) => res.json({ ok: true, timestamp: new Date().toISOString() }));
+app.get('/api/health', (req, res) => res.json({
+  ok: true,
+  timestamp: new Date().toISOString(),
+  nodeEnv: process.env.NODE_ENV,
+  cookieSameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+  cookieSecure: process.env.NODE_ENV === 'production',
+  hasRedis: !!process.env.UPSTASH_REDIS_REST_URL,
+  hasFrontendUrl: !!process.env.FRONTEND_URL,
+}));
 
 // Global error handler
 app.use((err, req, res, _next) => {
@@ -112,21 +120,17 @@ app.use((err, req, res, _next) => {
   res.status(500).json({ error: isDev ? (err.message || 'Internal server error') : 'Internal server error' });
 });
 
-// Local dev: start server normally
-// In production (Vercel), the app is exported below and serverless handles listening
-if (process.env.NODE_ENV !== 'production') {
-  db.ready
-    .then(() => {
-      app.listen(PORT, () => {
-        console.log(`LMHA backend running on port ${PORT}`);
-        console.log(`Frontend: ${FRONTEND_URL}`);
-        console.log(`Protected admin email: ${PROTECTED_EMAIL || '(none set)'}`);
-      });
-    })
-    .catch(err => {
-      console.error('[DB] Initialisation failed:', err);
-      process.exit(1);
+db.ready
+  .then(() => {
+    app.listen(PORT, () => {
+      console.log(`LMHA backend running on port ${PORT}`);
+      console.log(`Frontend: ${FRONTEND_URL}`);
+      console.log(`Protected admin email: ${PROTECTED_EMAIL || '(none set)'}`);
     });
-}
+  })
+  .catch(err => {
+    console.error('[DB] Initialisation failed:', err);
+    process.exit(1);
+  });
 
 module.exports = app;
