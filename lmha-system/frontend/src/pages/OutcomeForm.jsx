@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import Layout from '../components/Layout'
-import { apiUrl } from '../lib/api'
+import { apiFetch } from '../lib/api'
 import { LOCK_DAYS } from '../lib/constants'
 
 const SUPPORT_TYPES = [
@@ -34,7 +34,7 @@ export default function OutcomeForm() {
   })
 
   useEffect(() => {
-    fetch(apiUrl(`/api/bookings/${id}`), { credentials: 'include' })
+    apiFetch(`/api/bookings/${id}`)
       .then(r => r.json())
       .then(b => {
         setBooking(b)
@@ -74,10 +74,9 @@ export default function OutcomeForm() {
     setError(''); setSaving(true)
 
     try {
-      const res = await fetch(apiUrl(`/api/bookings/${id}`), {
+      const res = await apiFetch(`/api/bookings/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
         body: JSON.stringify({
           outcome: form.outcome,
           time_in: form.time_in || null,
@@ -109,10 +108,9 @@ export default function OutcomeForm() {
     setError(''); setSaving(true)
 
     try {
-      const res = await fetch(apiUrl(`/api/bookings/${id}`), {
+      const res = await apiFetch(`/api/bookings/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
         body: JSON.stringify({
           outcome: form.outcome,
           time_in: form.time_in || null,

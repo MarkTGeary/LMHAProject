@@ -1,60 +1,52 @@
 const express = require('express');
 const passport = require('passport');
+const jwt = require('jsonwebtoken');
 const router = express.Router();
 
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
+const JWT_SECRET = process.env.SESSION_SECRET || 'lmha-dev-secret-change-me';
 
-// Kick off Google login, store location in session for after callback
 router.get('/google', (req, res, next) => {
-  if (req.query.location) {
-    req.session.pendingLocation = req.query.location;
-  }
   passport.authenticate('google', { scope: ['profile', 'email'], prompt: 'select_account' })(req, res, next);
 });
 
-// Google redirects back here
 router.get('/google/callback',
   passport.authenticate('google', {
     failureRedirect: `${FRONTEND_URL}/login?error=unauthorized`,
+    session: false,
   }),
   (req, res) => {
-    const location = req.session.pendingLocation;
-    delete req.session.pendingLocation;
-
-    if (location) {
-      req.session.location = location;
-      return res.redirect(`${FRONTEND_URL}/`);
-    }
-
-    res.redirect(`${FRONTEND_URL}/location`);
+    const token = jwt.sign(
+      { id: req.user.id, email: req.user.email, name: req.user.name, picture: req.user.picture },
+      JWT_SECRET,
+      { expiresIn: '8h' }
+    );
+    console.log('[Auth] JWT issued for:', req.user.email);
+    res.redirect(`${FRONTEND_URL}/location?token=${token}`);
   }
 );
 
-// Frontend calls this to get current user + location
 router.get('/me', (req, res) => {
-  if (!req.isAuthenticated()) return res.status(401).json({ error: 'Not authenticated' });
-  res.json({
-    ...req.user,
-    location: req.session.location || null,
-  });
+  const auth = req.headers.authorization;
+  if (!auth?.startsWith('Bearer ')) return res.status(401).json({ error: 'Not authenticated' });
+  try {
+    const user = jwt.verify(auth.slice(7), JWT_SECRET);
+    res.json({ id: user.id, email: user.email, name: user.name, picture: user.picture });
+  } catch {
+    res.status(401).json({ error: 'Invalid or expired token' });
+  }
 });
 
-// Set location in session without re-running OAuth
 router.post('/location', (req, res) => {
-  if (!req.isAuthenticated()) return res.status(401).json({ error: 'Not authenticated' });
   const { location } = req.body || {};
   if (!['LMHA', 'Solace Café'].includes(location)) {
     return res.status(400).json({ error: 'Invalid location' });
   }
-  req.session.location = location;
-  req.session.save((err) => {
-    if (err) return res.status(500).json({ error: 'Session save failed' });
-    res.json({ ok: true });
-  });
+  res.json({ ok: true });
 });
 
 router.get('/logout', (req, res) => {
-  req.logout(() => res.redirect(FRONTEND_URL));
+  res.json({ ok: true });
 });
 
 module.exports = router;

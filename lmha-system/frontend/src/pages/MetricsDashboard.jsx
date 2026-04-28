@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useAuth } from '../App'
 import Layout from '../components/Layout'
 import MetricsPreview from '../components/MetricsPreview'
-import { apiUrl } from '../lib/api'
+import { apiFetch } from '../lib/api'
 
 function getMondayOfWeek(d = new Date()) {
   const day = d.getDay()
@@ -34,9 +34,8 @@ export default function MetricsDashboard() {
 
   const loadFeedback = async (weekStart) => {
     try {
-      const res = await fetch(
-        apiUrl(`/api/metrics/feedback?location=${encodeURIComponent(location)}&week_start=${weekStart}`),
-        { credentials: 'include' }
+      const res = await apiFetch(
+        `/api/metrics/feedback?location=${encodeURIComponent(location)}&week_start=${weekStart}`
       )
       if (res.ok) {
         const data = await res.json()
@@ -48,10 +47,9 @@ export default function MetricsDashboard() {
   const saveFeedback = async () => {
     setFeedbackSaving(true); setFeedbackSaved(false); setFeedbackError(false)
     try {
-      const res = await fetch(apiUrl('/api/metrics/feedback'), {
+      const res = await apiFetch('/api/metrics/feedback', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
         body: JSON.stringify({ location, week_start: currentWeekStart, ...feedback }),
       })
       if (!res.ok) { setFeedbackError(true) } else {
@@ -65,9 +63,8 @@ export default function MetricsDashboard() {
   const loadFromSheets = async () => {
     setError(''); setMetrics(null); setSubmitResult(null); setLoadingSheets(true)
     try {
-      const res = await fetch(
-        apiUrl(`/api/metrics/read?location=${encodeURIComponent(location)}&start=${start}&end=${end}`),
-        { credentials: 'include' }
+      const res = await apiFetch(
+        `/api/metrics/read?location=${encodeURIComponent(location)}&start=${start}&end=${end}`
       )
       const data = await res.json()
       if (!res.ok) { setError(data.error); setLoadingSheets(false); return }
@@ -84,9 +81,8 @@ export default function MetricsDashboard() {
     setError(''); setMetrics(null); setSubmitResult(null); setLoading(true)
     await loadFeedback(start)
     try {
-      const res = await fetch(
-        apiUrl(`/api/metrics/preview?location=${encodeURIComponent(location)}&start=${start}&end=${end}`),
-        { credentials: 'include' }
+      const res = await apiFetch(
+        `/api/metrics/preview?location=${encodeURIComponent(location)}&start=${start}&end=${end}`
       )
       const data = await res.json()
       if (!res.ok) { setError(data.error); setLoading(false); return }
@@ -102,10 +98,9 @@ export default function MetricsDashboard() {
     if (!confirm(`Push metrics for ${location} (${start} to ${end}) to Google Sheets? This cannot be undone.`)) return
     setError(''); setSubmitting(true); setSubmitResult(null)
     try {
-      const res = await fetch(apiUrl('/api/metrics/submit'), {
+      const res = await apiFetch('/api/metrics/submit', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
         body: JSON.stringify({ location, start, end }),
       })
       const data = await res.json()

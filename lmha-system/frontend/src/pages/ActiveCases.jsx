@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { useAuth } from '../App'
 import Layout from '../components/Layout'
 import BookingCard from '../components/BookingCard'
-import { apiUrl } from '../lib/api'
+import { apiFetch } from '../lib/api'
 
 export default function ActiveCases() {
   const { location } = useAuth()
@@ -27,7 +27,7 @@ export default function ActiveCases() {
     if (filters.intakeStatus !== 'all') params.set('intake_status', filters.intakeStatus)
     if (filters.search.trim()) params.set('search', filters.search.trim())
 
-    fetch(apiUrl(`/api/bookings?${params}`), { credentials: 'include' })
+    apiFetch(`/api/bookings?${params}`)
       .then(r => r.json())
       .then(data => { setBookings(Array.isArray(data) ? data : []); setLoading(false) })
       .catch(() => setLoading(false))

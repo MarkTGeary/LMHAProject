@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import Layout from '../components/Layout'
-import { apiUrl } from '../lib/api'
+import { apiFetch } from '../lib/api'
 
 export default function Settings() {
   const [emails, setEmails] = useState([])
@@ -13,7 +13,7 @@ export default function Settings() {
 
   const load = () => {
     setLoading(true)
-    fetch(apiUrl('/api/admin/emails'), { credentials: 'include' })
+    apiFetch('/api/admin/emails')
       .then(r => r.json())
       .then(data => {
         setEmails(data.emails || [])
@@ -31,10 +31,9 @@ export default function Settings() {
     const email = newEmail.trim().toLowerCase()
     if (!email) return
     setAdding(true)
-    const res = await fetch(apiUrl('/api/admin/emails'), {
+    const res = await apiFetch('/api/admin/emails', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
       body: JSON.stringify({ email }),
     })
     const data = await res.json()
@@ -48,9 +47,8 @@ export default function Settings() {
   const removeEmail = async (email) => {
     setError('')
     setSuccess('')
-    const res = await fetch(apiUrl(`/api/admin/emails/${encodeURIComponent(email)}`), {
+    const res = await apiFetch(`/api/admin/emails/${encodeURIComponent(email)}`, {
       method: 'DELETE',
-      credentials: 'include',
     })
     const data = await res.json()
     if (!res.ok) { setError(data.error || 'Failed to remove'); return }
