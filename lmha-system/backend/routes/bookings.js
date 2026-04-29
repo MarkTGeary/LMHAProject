@@ -192,7 +192,7 @@ router.post('/', requireAuth, async (req, res, next) => {
       return res.status(400).json({ error: 'location, date, time_booked, and interaction_type are required' });
     }
 
-    if (location !== req.session.location) {
+    if (location !== req.headers['x-location']) {
       return res.status(403).json({ error: 'Location does not match your current session' });
     }
 
