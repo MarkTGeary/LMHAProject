@@ -12,7 +12,7 @@ router.get('/preview', requireAuth, async (req, res, next) => {
     if (!location || !start || !end) {
       return res.status(400).json({ error: 'location, start, and end are required' });
     }
-    if (location !== req.session.location) {
+    if (location !== req.headers['x-location']) {
       return res.status(403).json({ error: 'Location does not match your current session' });
     }
 
@@ -36,7 +36,7 @@ router.post('/submit', requireAuth, async (req, res, next) => {
     if (!location || !start || !end) {
       return res.status(400).json({ error: 'location, start, and end are required' });
     }
-    if (location !== req.session.location) {
+    if (location !== req.headers['x-location']) {
       return res.status(403).json({ error: 'Location does not match your current session' });
     }
 
@@ -61,7 +61,7 @@ router.get('/read', requireAuth, async (req, res, next) => {
     if (!location || !start || !end) {
       return res.status(400).json({ error: 'location, start, and end are required' });
     }
-    if (location !== req.session.location) {
+    if (location !== req.headers['x-location']) {
       return res.status(403).json({ error: 'Location does not match your current session' });
     }
     const metrics = await readMetrics(location, start, end);
