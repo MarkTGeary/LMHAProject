@@ -63,6 +63,23 @@ function delay(ms) {
   return new Promise(resolve => setTimeout(resolve, ms))
 }
 
+function errorMessage(value, fallback = 'Request failed') {
+  if (!value) return fallback
+  if (typeof value === 'string') return value
+  if (value instanceof Error) return value.message || fallback
+  if (typeof value === 'object') {
+    if (typeof value.message === 'string') return value.message
+    if (typeof value.error === 'string') return value.error
+    if (value.error) return errorMessage(value.error, fallback)
+    try {
+      return JSON.stringify(value)
+    } catch {
+      return fallback
+    }
+  }
+  return String(value)
+}
+
 async function fetchCurrentUser() {
   const res = await apiFetch('/auth/me', { headers: { Accept: 'application/json' } })
   let data = null
@@ -75,7 +92,7 @@ async function fetchCurrentUser() {
     throw err
   }
   if (!res.ok) {
-    const err = new Error(data?.error || 'Not authenticated')
+    const err = new Error(errorMessage(data?.error || data, 'Not authenticated'))
     err.status = res.status
     throw err
   }
@@ -129,7 +146,7 @@ export default function App() {
       if (fromOAuth && unauthorised) {
         setAuthError('The login succeeded, but the browser did not send the session cookie back to the API. Use the same-origin Vercel proxy or same-site custom domains for Vercel and Render.')
       } else if (!unauthorised) {
-        setAuthError(lastError?.message || 'Could not reach the authentication service. Please retry.')
+        setAuthError(errorMessage(lastError, 'Could not reach the authentication service. Please retry.'))
       } else {
         setAuthError('')
       }
