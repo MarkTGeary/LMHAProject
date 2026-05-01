@@ -52,12 +52,18 @@ function parseDateString(value, label = 'date') {
   return value;
 }
 
-function parseTimeString(value, label = 'time') {
+function parseTimeString(value, label = 'time', { stepMinutes = 30 } = {}) {
   if (typeof value !== 'string' || !/^\d{2}:\d{2}$/.test(value)) {
     throw badRequest(`Invalid ${label}`);
   }
   const [hours, minutes] = value.split(':').map(Number);
-  if (hours < 0 || hours > 23 || minutes < 0 || minutes > 59 || minutes % 30 !== 0) {
+  if (
+    hours < 0 ||
+    hours > 23 ||
+    minutes < 0 ||
+    minutes > 59 ||
+    (stepMinutes && minutes % stepMinutes !== 0)
+  ) {
     throw badRequest(`Invalid ${label}`);
   }
   return value;

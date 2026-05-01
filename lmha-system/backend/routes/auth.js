@@ -2,27 +2,54 @@ const express = require('express');
 const passport = require('passport');
 const router = express.Router();
 
-const { getPrimaryFrontendUrl } = require('../lib/config');
+const { getBackendUrl, getFrontendUrls, getPrimaryFrontendUrl, normaliseOrigin } = require('../lib/config');
 const { createAuthToken, clearAuthCookie, hasValidCsrf, publicUserFromPayload, readAuthPayload, setAuthCookie } = require('../lib/authTokens');
 const { requireAuth } = require('../middleware/requireAuth');
 
 const FRONTEND_URL = getPrimaryFrontendUrl();
+const FRONTEND_URLS = getFrontendUrls();
+const BACKEND_URL = getBackendUrl();
+
+function getTrustedRequestOrigin(req) {
+  const forwardedHost = (req.get('x-forwarded-host') || '').split(',')[0].trim();
+  const host = forwardedHost || (req.get('host') || '').split(',')[0].trim();
+  if (!host) return '';
+  const proto = (req.get('x-forwarded-proto') || '').split(',')[0].trim() || req.protocol || 'http';
+  const origin = normaliseOrigin(`${proto}://${host}`);
+  return FRONTEND_URLS.includes(origin) ? origin : '';
+}
+
+function getOAuthCallbackUrl(req) {
+  const origin = getTrustedRequestOrigin(req);
+  return `${origin || BACKEND_URL}/auth/google/callback`;
+}
+
+function getRedirectFrontendUrl(req) {
+  return getTrustedRequestOrigin(req) || FRONTEND_URL;
+}
 
 router.get('/google', (req, res, next) => {
-  passport.authenticate('google', { scope: ['profile', 'email'], prompt: 'select_account' })(req, res, next);
+  passport.authenticate('google', {
+    scope: ['profile', 'email'],
+    prompt: 'select_account',
+    callbackURL: getOAuthCallbackUrl(req),
+  })(req, res, next);
 });
 
 router.get('/google/callback',
-  passport.authenticate('google', {
-    failureRedirect: `${FRONTEND_URL}/login?error=unauthorized`,
-    session: false,
-  }),
+  (req, res, next) => {
+    passport.authenticate('google', {
+      failureRedirect: `${getRedirectFrontendUrl(req)}/login?error=unauthorized`,
+      session: false,
+      callbackURL: getOAuthCallbackUrl(req),
+    })(req, res, next);
+  },
   (req, res) => {
     const { token } = createAuthToken(req.user);
     setAuthCookie(res, token);
     res.setHeader('Cache-Control', 'no-store');
     console.log('[Auth] Cookie JWT issued for:', req.user.email);
-    res.redirect(`${FRONTEND_URL}/location?auth=1`);
+    res.redirect(`${getRedirectFrontendUrl(req)}/location?auth=1`);
   }
 );
 
