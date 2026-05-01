@@ -25,6 +25,9 @@ services:
         sync: false
       - key: BACKEND_URL
         sync: false
+      # If using the Vercel same-origin proxy, set BACKEND_URL to the Vercel
+      # frontend origin so Google OAuth callbacks land on /auth/google/callback
+      # and are proxied to Render.
       - key: TURSO_DATABASE_URL
         sync: false
       - key: TURSO_AUTH_TOKEN
@@ -39,4 +42,3 @@ services:
         sync: false
       - key: APP_TIME_ZONE
         value: Europe/Dublin
-        sync: false

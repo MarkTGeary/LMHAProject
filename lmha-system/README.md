@@ -35,8 +35,23 @@ Open http://localhost:5173
 1. Go to [Google Cloud Console](https://console.cloud.google.com/)
 2. Create a project → APIs & Services → Credentials
 3. Create **OAuth 2.0 Client ID** (Web application)
-   - Authorised redirect URI: `http://localhost:3000/auth/google/callback`
+   - Local redirect URI: `http://localhost:3000/auth/google/callback`
+   - Production redirect URI, if using the Vercel proxy: `https://your-frontend.vercel.app/auth/google/callback`
 4. Copy Client ID and Secret to `backend/.env`
+
+## Production Auth on Vercel + Render
+
+Browsers can block cross-site cookies between `vercel.app` and `onrender.com`,
+especially on tablets. In production, prefer the included Vercel same-origin
+proxy:
+
+- On Vercel, leave `VITE_API_URL` blank and set `BACKEND_PROXY_URL` to the
+  Render backend origin, for example `https://lmha-backend.onrender.com`.
+- On Render, set `FRONTEND_URL` and `BACKEND_URL` to the Vercel frontend origin.
+- In Google OAuth, use the Vercel callback URL shown above.
+
+This makes `/auth/*` and `/api/*` same-origin from the browser while still
+running the backend on Render.
 
 ## Setup: Google Service Account (for Sheets API)
 

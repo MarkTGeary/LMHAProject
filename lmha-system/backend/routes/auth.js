@@ -20,8 +20,9 @@ router.get('/google/callback',
   (req, res) => {
     const { token } = createAuthToken(req.user);
     setAuthCookie(res, token);
+    res.setHeader('Cache-Control', 'no-store');
     console.log('[Auth] Cookie JWT issued for:', req.user.email);
-    res.redirect(`${FRONTEND_URL}/location`);
+    res.redirect(`${FRONTEND_URL}/location?auth=1`);
   }
 );
 
