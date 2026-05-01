@@ -172,13 +172,6 @@ export default function MetricsDashboard() {
           </div>
         )}
 
-        {submitResult && (
-          <div className="bg-green-50 border-2 border-green-300 rounded-xl p-4 text-green-700">
-            <div className="font-bold">✓ Successfully pushed to Google Sheets</div>
-            <div className="text-sm mt-1">{submitResult.updatedCells} cells updated in column {submitResult.column}</div>
-          </div>
-        )}
-
         {metrics && (
           <>
             <div className="card">
@@ -216,6 +209,13 @@ export default function MetricsDashboard() {
                 </button>
               )}
             </div>
+
+            {submitResult && (
+              <div className="bg-green-50 border-2 border-green-300 rounded-xl p-4 text-green-700">
+                <div className="font-bold">✓ Successfully pushed to Google Sheets</div>
+                <div className="text-sm mt-1">{submitResult.updatedCells} cells updated in column {submitResult.column}</div>
+              </div>
+            )}
 
             {metrics?._source !== 'sheets' && (
               <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-amber-800 text-sm no-print">

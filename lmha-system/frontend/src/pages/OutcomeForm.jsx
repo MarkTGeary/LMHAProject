@@ -168,18 +168,6 @@ export default function OutcomeForm() {
           </div>
         )}
 
-        {error && (
-          <div className="bg-red-50 border-2 border-red-300 rounded-xl p-4 text-red-700 font-semibold">
-            {error}
-          </div>
-        )}
-
-        {success && (
-          <div className="bg-green-50 border-2 border-green-300 rounded-xl p-4 text-green-700 font-semibold">
-            ✓ Outcome saved. You can continue editing or close the case below.
-          </div>
-        )}
-
         {/* Outcome */}
         <div className="card">
           <h2 className="text-xl font-bold mb-4">Outcome <span className="text-red-500">*</span></h2>
@@ -271,6 +259,18 @@ export default function OutcomeForm() {
             onChange={e => set('limitations', e.target.value)}
           />
         </div>
+
+        {error && (
+          <div className="bg-red-50 border-2 border-red-300 rounded-xl p-4 text-red-700 font-semibold">
+            {error}
+          </div>
+        )}
+
+        {success && (
+          <div className="bg-green-50 border-2 border-green-300 rounded-xl p-4 text-green-700 font-semibold">
+            ✓ Outcome saved. You can continue editing or close the case below.
+          </div>
+        )}
 
         {/* Actions */}
         <button onClick={saveOutcome} disabled={saving || isLocked} className="btn-primary btn-lg w-full">

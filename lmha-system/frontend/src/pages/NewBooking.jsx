@@ -158,13 +158,6 @@ export default function NewBooking({ editMode }) {
           </div>
         )}
 
-        {/* Error */}
-        {error && (
-          <div className="bg-red-50 border-2 border-red-300 rounded-xl p-4 text-red-700 font-semibold">
-            {error}
-          </div>
-        )}
-
         {/* Service User */}
         <div className="card">
           <h2 className="text-xl font-bold mb-4">Person Details</h2>
@@ -319,6 +312,12 @@ export default function NewBooking({ editMode }) {
               onChange={e => set('notes', e.target.value)} placeholder="Any additional notes..." />
           </div>
         </div>
+
+        {error && (
+          <div className="bg-red-50 border-2 border-red-300 rounded-xl p-4 text-red-700 font-semibold">
+            {error}
+          </div>
+        )}
 
         <button
           onClick={submit}
