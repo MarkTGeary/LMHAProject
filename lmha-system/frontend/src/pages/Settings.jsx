@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react'
 import Layout from '../components/Layout'
 import { apiFetch } from '../lib/api'
+import { useAuth } from '../App'
 
 export default function Settings() {
+  const { user } = useAuth()
   const [emails, setEmails] = useState([])
   const [protectedEmail, setProtectedEmail] = useState('')
   const [newEmail, setNewEmail] = useState('')
@@ -65,6 +67,7 @@ export default function Settings() {
   const removeEmail = async (email) => {
     setError('')
     setSuccess('')
+    if (!window.confirm(`Remove ${email} from the allowlist? They will no longer be able to log in.`)) return
     const res = await apiFetch(`/api/admin/emails/${encodeURIComponent(email)}`, {
       method: 'DELETE',
     })
@@ -145,11 +148,15 @@ export default function Settings() {
             <ul className="divide-y divide-gray-100">
               {emails.map(({ email, role, added_by, added_at, protected: isProtected }) => {
                 const currentRole = isProtected ? 'admin' : (role || 'worker')
+                const isSelf = email === user?.email
                 return (
                   <li key={email} className="py-3">
                     <div className="flex items-center gap-3">
                     <div className="flex-1 min-w-0">
-                      <div className="font-medium text-gray-800 truncate">{email}</div>
+                      <div className="font-medium text-gray-800 truncate">
+                        {email}
+                        {isSelf && <span className="ml-2 text-xs text-gray-400">(you)</span>}
+                      </div>
                       <div className="text-xs text-gray-400">
                         Added {new Date(added_at).toLocaleDateString('en-IE')}
                         {added_by && added_by !== 'system' ? ` by ${added_by}` : ''}
@@ -174,8 +181,9 @@ export default function Settings() {
                       <div className="flex gap-2 mt-3">
                         <button
                           onClick={() => changeRole(email, currentRole === 'admin' ? 'worker' : 'admin')}
-                          disabled={updating === email}
-                          className="btn-secondary btn-sm flex-1"
+                          disabled={updating === email || isSelf}
+                          title={isSelf ? 'You cannot change your own role' : undefined}
+                          className="btn-secondary btn-sm flex-1 disabled:opacity-40 disabled:cursor-not-allowed"
                         >
                           {updating === email
                             ? 'Updating...'
@@ -184,12 +192,14 @@ export default function Settings() {
                               : 'Make Admin'
                           }
                         </button>
-                      <button
-                        onClick={() => removeEmail(email)}
-                          className="btn-danger btn-sm flex-1"
-                      >
-                        Remove
-                      </button>
+                        <button
+                          onClick={() => removeEmail(email)}
+                          disabled={isSelf}
+                          title={isSelf ? 'You cannot remove yourself' : undefined}
+                          className="btn-danger btn-sm flex-1 disabled:opacity-40 disabled:cursor-not-allowed"
+                        >
+                          Remove
+                        </button>
                       </div>
                     )}
                   </li>

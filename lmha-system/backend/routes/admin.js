@@ -57,6 +57,9 @@ router.patch('/emails/:email', async (req, res, next) => {
     if (isRootAdminEmail(email)) {
       throw forbidden('This email is the protected root admin and cannot be demoted');
     }
+    if (email === normaliseEmail(req.user.email)) {
+      throw forbidden('You cannot change your own role');
+    }
     const role = normaliseRole(req.body.role);
     const result = await db.execute({
       sql: 'UPDATE allowed_emails SET role = ? WHERE email = ?',
@@ -73,6 +76,9 @@ router.delete('/emails/:email', async (req, res, next) => {
     const email = normaliseEmail(req.params.email);
     if (isRootAdminEmail(email)) {
       throw forbidden('This email is the protected root admin and cannot be removed');
+    }
+    if (email === normaliseEmail(req.user.email)) {
+      throw forbidden('You cannot remove yourself from the allowlist');
     }
     const result = await db.execute({
       sql: 'DELETE FROM allowed_emails WHERE email = ?',
