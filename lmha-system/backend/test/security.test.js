@@ -8,7 +8,7 @@ process.env.NODE_ENV = 'test';
 process.env.TURSO_DATABASE_URL = `file:${path.join(os.tmpdir(), `lmha-test-${Date.now()}-${Math.random().toString(16).slice(2)}.db`)}`;
 process.env.SESSION_SECRET = 'test-secret-that-is-long-enough-for-jwt-signing';
 process.env.ALLOWED_EMAILS = 'admin@example.com,staff@example.com';
-process.env.ADMIN_EMAILS = 'admin@example.com';
+process.env.ADMIN_EMAILS = 'admin@example.com,configadmin@example.com';
 process.env.ROOT_ADMIN_EMAIL = 'admin@example.com';
 process.env.FRONTEND_URL = 'http://localhost:5173';
 process.env.BACKEND_URL = 'http://localhost:3000';
@@ -45,6 +45,7 @@ function authFor(email) {
 }
 
 const admin = authFor('admin@example.com');
+const configAdmin = authFor('configadmin@example.com');
 const staff = authFor('staff@example.com');
 
 before(async () => {
@@ -61,6 +62,17 @@ test('auth/me returns public user, admin flag, and csrf token', async () => {
   assert.equal(res.body.isAdmin, true);
   assert.equal(res.body.role, 'admin');
   assert.equal(typeof res.body.csrfToken, 'string');
+});
+
+test('configured admin emails are seeded as admins even when not in allowed emails', async () => {
+  const res = await request(app)
+    .get('/auth/me')
+    .set('Cookie', configAdmin.cookie)
+    .expect(200);
+
+  assert.equal(res.body.email, 'configadmin@example.com');
+  assert.equal(res.body.isAdmin, true);
+  assert.equal(res.body.role, 'admin');
 });
 
 test('unsafe requests require csrf', async () => {
@@ -204,6 +216,39 @@ test('booking slot locks reject overlapping bookings', async () => {
       full_name: 'Post Cancel Booking',
     })
     .expect(201);
+});
+
+test('outcome session times accept non-slot minutes', async () => {
+  const date = nextWeekday(2);
+  const booking = await request(app)
+    .post('/api/bookings')
+    .set('Cookie', staff.cookie)
+    .set('X-CSRF-Token', staff.csrfToken)
+    .set('X-Location', 'LMHA')
+    .send({
+      location: 'LMHA',
+      date,
+      time_booked: '14:00',
+      interaction_type: 'Walk-In',
+      full_name: 'Outcome Time Test',
+    })
+    .expect(201);
+
+  const updated = await request(app)
+    .patch(`/api/bookings/${booking.body.id}`)
+    .set('Cookie', staff.cookie)
+    .set('X-CSRF-Token', staff.csrfToken)
+    .set('X-Location', 'LMHA')
+    .send({
+      outcome: 'Attended',
+      time_in: '12:40',
+      time_out: '13:40',
+      type_of_support: ['SS'],
+    })
+    .expect(200);
+
+  assert.equal(updated.body.time_in, '12:40');
+  assert.equal(updated.body.time_out, '13:40');
 });
 
 test('metrics feedback is scoped to current location', async () => {

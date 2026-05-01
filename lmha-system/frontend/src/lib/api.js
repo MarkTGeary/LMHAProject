@@ -1,4 +1,6 @@
-const BASE = import.meta.env.VITE_API_URL || '';
+const configuredBase = (import.meta.env.VITE_API_URL || '').replace(/\/+$/, '');
+const useDirectApi = import.meta.env.DEV || import.meta.env.VITE_USE_DIRECT_API === 'true';
+const BASE = useDirectApi ? configuredBase : '';
 let csrfToken = null;
 
 export function apiUrl(path) {

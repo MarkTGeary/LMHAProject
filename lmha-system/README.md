@@ -45,10 +45,15 @@ Browsers can block cross-site cookies between `vercel.app` and `onrender.com`,
 especially on tablets. In production, prefer the included Vercel same-origin
 proxy:
 
-- On Vercel, leave `VITE_API_URL` blank and set `BACKEND_PROXY_URL` to the
-  Render backend origin, for example `https://lmha-backend.onrender.com`.
+- On Vercel, set `BACKEND_PROXY_URL` to the Render backend origin, for example
+  `https://lmha-backend.onrender.com`. Production frontend builds use the
+  same-origin proxy by default so browser cookies stay on the Vercel domain.
 - On Render, set `FRONTEND_URL` and `BACKEND_URL` to the Vercel frontend origin.
 - In Google OAuth, use the Vercel callback URL shown above.
+
+Do not point the deployed browser app directly at Render with `VITE_API_URL`
+unless you also set `VITE_USE_DIRECT_API=true` and accept third-party cookie
+blocking in Firefox, Brave, Safari, and stricter tablet browsers.
 
 This makes `/auth/*` and `/api/*` same-origin from the browser while still
 running the backend on Render.
@@ -71,10 +76,12 @@ ROOT_ADMIN_EMAIL=supervisor@lmha.ie
 APP_TIME_ZONE=Europe/Dublin
 ```
 
-Only these Google accounts can log in.
-Admins can manage the account list in Settings. `ROOT_ADMIN_EMAIL` is always
-kept as an admin and cannot be removed or demoted; if it is blank, the first
-`ADMIN_EMAILS` address is used, then the first `ALLOWED_EMAILS` address.
+`ALLOWED_EMAILS` seeds ordinary workers. `ADMIN_EMAILS` is an environment-level
+admin list and is re-applied on startup, even if those emails are not also in
+`ALLOWED_EMAILS`.
+`ROOT_ADMIN_EMAIL` is always kept as an admin and cannot be removed or demoted;
+if it is blank, the first `ADMIN_EMAILS` address is used, then the first
+`ALLOWED_EMAILS` address.
 
 ## Setup: Google Sheets
 

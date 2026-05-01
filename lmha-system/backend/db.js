@@ -166,8 +166,8 @@ async function initAndMigrate() {
         added_at TEXT DEFAULT (datetime('now'))
       )
     `);
-    const seedEmails = [...new Set([...getAllowedEmailSeeds(), getRootAdminEmail()].filter(Boolean))];
     const adminEmails = getAdminEmails();
+    const seedEmails = [...new Set([...getAllowedEmailSeeds(), ...adminEmails, getRootAdminEmail()].filter(Boolean))];
     for (const e of seedEmails) {
       await _client.execute({
         sql: 'INSERT OR IGNORE INTO allowed_emails (email, role, added_by) VALUES (?, ?, ?)',
@@ -192,7 +192,6 @@ async function initAndMigrate() {
 async function migrateAllowedEmailRoles() {
   const columnsResult = await _client.execute('PRAGMA table_info(allowed_emails)');
   const columns = columnsResult.rows.map(row => row.name);
-  const addedRoleColumn = !columns.includes('role');
   if (!columns.includes('role')) {
     console.log('[DB] Running migration: adding allowed_emails.role...');
     await _client.execute("ALTER TABLE allowed_emails ADD COLUMN role TEXT DEFAULT 'worker'");
@@ -201,7 +200,7 @@ async function migrateAllowedEmailRoles() {
   const adminEmails = getAdminEmails();
   const rootAdmin = getRootAdminEmail();
 
-  for (const email of [...new Set([...getAllowedEmailSeeds(), rootAdmin].filter(Boolean))]) {
+  for (const email of [...new Set([...getAllowedEmailSeeds(), ...adminEmails, rootAdmin].filter(Boolean))]) {
     await _client.execute({
       sql: `INSERT OR IGNORE INTO allowed_emails (email, role, added_by)
             VALUES (?, ?, ?)`,
@@ -209,13 +208,13 @@ async function migrateAllowedEmailRoles() {
     });
   }
 
-  if (addedRoleColumn) {
-    for (const email of adminEmails) {
-      await _client.execute({
-        sql: "UPDATE allowed_emails SET role = 'admin' WHERE email = ?",
-        args: [email],
-      });
-    }
+  for (const email of adminEmails) {
+    await _client.execute({
+      sql: `INSERT INTO allowed_emails (email, role, added_by)
+            VALUES (?, 'admin', 'system')
+            ON CONFLICT(email) DO UPDATE SET role = 'admin'`,
+      args: [email],
+    });
   }
 
   if (rootAdmin) {
