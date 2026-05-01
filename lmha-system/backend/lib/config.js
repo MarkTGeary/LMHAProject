@@ -18,9 +18,21 @@ function normaliseEmail(value) {
   return (value || '').trim().toLowerCase();
 }
 
+function normaliseOrigin(value) {
+  const raw = (value || '').trim();
+  if (!raw) return '';
+  try {
+    return new URL(raw).origin;
+  } catch {
+    return raw.replace(/\/+$/, '');
+  }
+}
+
 function getFrontendUrls() {
-  const urls = splitList(process.env.FRONTEND_URLS || process.env.FRONTEND_URL);
-  return urls.length ? urls : [DEFAULT_FRONTEND_URL];
+  const urls = splitList(process.env.FRONTEND_URLS || process.env.FRONTEND_URL)
+    .map(normaliseOrigin)
+    .filter(Boolean);
+  return urls.length ? [...new Set(urls)] : [DEFAULT_FRONTEND_URL];
 }
 
 function getPrimaryFrontendUrl() {
@@ -139,6 +151,7 @@ module.exports = {
   isProduction,
   isRootAdminEmail,
   normaliseEmail,
+  normaliseOrigin,
   splitList,
   validateProductionEnv,
 };
