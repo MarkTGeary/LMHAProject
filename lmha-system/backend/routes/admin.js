@@ -1,51 +1,84 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../db');
+const { getRootAdminEmail, isRootAdminEmail, normaliseEmail } = require('../lib/config');
+const { badRequest, conflict, forbidden, notFound } = require('../lib/errors');
 
-const PROTECTED_EMAIL = (process.env.ALLOWED_EMAILS || '').split(',')[0]?.trim().toLowerCase() || '';
+const ROLES = ['admin', 'worker'];
+
+function normaliseRole(value) {
+  const role = (value || 'worker').trim().toLowerCase();
+  if (!ROLES.includes(role)) throw badRequest('Invalid role');
+  return role;
+}
 
 // GET /api/admin/emails
 router.get('/emails', async (req, res, next) => {
   try {
-    const result = await db.execute('SELECT email, added_by, added_at FROM allowed_emails ORDER BY added_at ASC');
-    res.json({ emails: result.rows, protected: PROTECTED_EMAIL });
+    const rootAdmin = getRootAdminEmail();
+    const result = await db.execute('SELECT email, role, added_by, added_at FROM allowed_emails ORDER BY role ASC, added_at ASC');
+    const emails = result.rows.map(row => ({
+      ...row,
+      role: isRootAdminEmail(row.email) ? 'admin' : row.role || 'worker',
+      protected: isRootAdminEmail(row.email),
+    }));
+    res.json({ emails, protected: rootAdmin, roles: ROLES });
   } catch (err) { next(err); }
 });
 
-// POST /api/admin/emails  { email }
+// POST /api/admin/emails  { email, role }
 router.post('/emails', async (req, res, next) => {
   try {
-    const email = (req.body.email || '').trim().toLowerCase();
+    const email = normaliseEmail(req.body.email);
+    const role = isRootAdminEmail(email) ? 'admin' : normaliseRole(req.body.role);
     if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      return res.status(400).json({ error: 'Invalid email address' });
+      throw badRequest('Invalid email address');
     }
     try {
       await db.execute({
-        sql: 'INSERT INTO allowed_emails (email, added_by) VALUES (?, ?)',
-        args: [email, req.user?.email || 'unknown'],
+        sql: 'INSERT INTO allowed_emails (email, role, added_by) VALUES (?, ?, ?)',
+        args: [email, role, req.user.email],
       });
-      res.json({ ok: true, email });
+      res.json({ ok: true, email, role });
     } catch (e) {
       if (e.message?.includes('UNIQUE') || e.message?.includes('SQLITE_CONSTRAINT')) {
-        return res.status(409).json({ error: 'Email already on list' });
+        throw conflict('Email already on list');
       }
       throw e;
     }
   } catch (err) { next(err); }
 });
 
+// PATCH /api/admin/emails/:email  { role }
+router.patch('/emails/:email', async (req, res, next) => {
+  try {
+    const email = normaliseEmail(req.params.email);
+    if (!email) throw badRequest('Invalid email address');
+    if (isRootAdminEmail(email)) {
+      throw forbidden('This email is the protected root admin and cannot be demoted');
+    }
+    const role = normaliseRole(req.body.role);
+    const result = await db.execute({
+      sql: 'UPDATE allowed_emails SET role = ? WHERE email = ?',
+      args: [role, email],
+    });
+    if (result.rowsAffected === 0) throw notFound('Email not found');
+    res.json({ ok: true, email, role });
+  } catch (err) { next(err); }
+});
+
 // DELETE /api/admin/emails/:email
 router.delete('/emails/:email', async (req, res, next) => {
   try {
-    const email = req.params.email.toLowerCase();
-    if (email === PROTECTED_EMAIL) {
-      return res.status(403).json({ error: 'This email is protected and cannot be removed' });
+    const email = normaliseEmail(req.params.email);
+    if (isRootAdminEmail(email)) {
+      throw forbidden('This email is the protected root admin and cannot be removed');
     }
     const result = await db.execute({
       sql: 'DELETE FROM allowed_emails WHERE email = ?',
       args: [email],
     });
-    if (result.rowsAffected === 0) return res.status(404).json({ error: 'Email not found' });
+    if (result.rowsAffected === 0) throw notFound('Email not found');
     res.json({ ok: true });
   } catch (err) { next(err); }
 });

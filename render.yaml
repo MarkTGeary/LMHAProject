@@ -3,7 +3,7 @@ services:
     name: lmha-backend
     env: node
     rootDir: lmha-system/backend
-    buildCommand: npm install
+    buildCommand: npm ci
     startCommand: npm start
     envVars:
       - key: NODE_ENV
@@ -15,7 +15,13 @@ services:
         sync: false
       - key: SESSION_SECRET
         sync: false
+      - key: ADMIN_EMAILS
+        sync: false
+      - key: ROOT_ADMIN_EMAIL
+        sync: false
       - key: FRONTEND_URL
+        sync: false
+      - key: FRONTEND_URLS
         sync: false
       - key: BACKEND_URL
         sync: false
@@ -25,7 +31,12 @@ services:
         sync: false
       - key: ALLOWED_EMAILS
         sync: false
-      - key: UPSTASH_REDIS_REST_URL
+      - key: GOOGLE_SERVICE_ACCOUNT_JSON
         sync: false
-      - key: UPSTASH_REDIS_REST_TOKEN
+      - key: SPREADSHEET_ID_LMHA
+        sync: false
+      - key: SPREADSHEET_ID_SOLACE
+        sync: false
+      - key: APP_TIME_ZONE
+        value: Europe/Dublin
         sync: false

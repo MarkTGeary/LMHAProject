@@ -6,8 +6,10 @@ export default function Settings() {
   const [emails, setEmails] = useState([])
   const [protectedEmail, setProtectedEmail] = useState('')
   const [newEmail, setNewEmail] = useState('')
+  const [newRole, setNewRole] = useState('worker')
   const [loading, setLoading] = useState(true)
   const [adding, setAdding] = useState(false)
+  const [updating, setUpdating] = useState('')
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
 
@@ -34,13 +36,29 @@ export default function Settings() {
     const res = await apiFetch('/api/admin/emails', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email }),
+      body: JSON.stringify({ email, role: newRole }),
     })
     const data = await res.json()
     setAdding(false)
     if (!res.ok) { setError(data.error || 'Failed to add'); return }
     setNewEmail('')
-    setSuccess(`${email} added`)
+    setSuccess(`${email} added as ${newRole === 'admin' ? 'admin' : 'worker'}`)
+    load()
+  }
+
+  const changeRole = async (email, role) => {
+    setError('')
+    setSuccess('')
+    setUpdating(email)
+    const res = await apiFetch(`/api/admin/emails/${encodeURIComponent(email)}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ role }),
+    })
+    const data = await res.json()
+    setUpdating('')
+    if (!res.ok) { setError(data.error || 'Failed to update role'); return }
+    setSuccess(`${email} is now ${role === 'admin' ? 'an admin' : 'a worker'}`)
     load()
   }
 
@@ -61,28 +79,50 @@ export default function Settings() {
       <div className="space-y-6 pb-10 max-w-xl">
 
         <div className="card">
-          <h2 className="text-xl font-bold mb-1">Allowed Emails</h2>
+          <h2 className="text-xl font-bold mb-1">Account Access</h2>
           <p className="text-sm text-gray-500 mb-5">
-            Only these email addresses can log in to the system via Google.
+            Admins can manage access. Workers can use the service but cannot change accounts.
           </p>
+          {protectedEmail && (
+            <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 mb-5">
+              <div className="text-xs font-bold uppercase text-blue-600 tracking-wide">Protected Root Admin</div>
+              <div className="text-blue-900 font-semibold truncate mt-0.5">{protectedEmail}</div>
+            </div>
+          )}
 
           {/* Add form */}
-          <div className="flex gap-2 mb-5">
+          <div className="space-y-3 mb-5">
             <input
-              className="input flex-1"
+              className="input"
               type="email"
               placeholder="name@example.com"
               value={newEmail}
               onChange={e => { setNewEmail(e.target.value); setError(''); setSuccess('') }}
               onKeyDown={e => e.key === 'Enter' && addEmail()}
             />
-            <button
-              onClick={addEmail}
-              disabled={adding || !newEmail.trim()}
-              className="btn-primary px-5"
-            >
-              {adding ? 'Adding…' : 'Add'}
-            </button>
+            <div className="flex gap-2">
+              {[
+                ['worker', 'Worker'],
+                ['admin', 'Admin'],
+              ].map(([role, label]) => (
+                <button
+                  key={role}
+                  onClick={() => setNewRole(role)}
+                  className={`btn-sm flex-1 border-2 font-semibold ${
+                    newRole === role ? 'bg-blue-600 border-blue-600 text-white' : 'bg-white border-gray-300 text-gray-700'
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+              <button
+                onClick={addEmail}
+                disabled={adding || !newEmail.trim()}
+                className="btn-primary px-5"
+              >
+                {adding ? 'Adding…' : 'Add'}
+              </button>
+            </div>
           </div>
 
           {error && (
@@ -103,10 +143,11 @@ export default function Settings() {
             <div className="text-gray-400 text-sm py-4 text-center">No emails configured</div>
           ) : (
             <ul className="divide-y divide-gray-100">
-              {emails.map(({ email, added_by, added_at }) => {
-                const isProtected = email === protectedEmail
+              {emails.map(({ email, role, added_by, added_at, protected: isProtected }) => {
+                const currentRole = isProtected ? 'admin' : (role || 'worker')
                 return (
-                  <li key={email} className="flex items-center gap-3 py-3">
+                  <li key={email} className="py-3">
+                    <div className="flex items-center gap-3">
                     <div className="flex-1 min-w-0">
                       <div className="font-medium text-gray-800 truncate">{email}</div>
                       <div className="text-xs text-gray-400">
@@ -114,17 +155,42 @@ export default function Settings() {
                         {added_by && added_by !== 'system' ? ` by ${added_by}` : ''}
                       </div>
                     </div>
-                    {isProtected ? (
-                      <span className="text-xs font-semibold text-blue-600 bg-blue-50 border border-blue-200 rounded-lg px-2 py-1 shrink-0">
-                        Protected
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span className={`text-xs font-semibold border rounded-lg px-2 py-1 ${
+                        currentRole === 'admin'
+                          ? 'text-blue-700 bg-blue-50 border-blue-200'
+                          : 'text-gray-600 bg-gray-50 border-gray-200'
+                      }`}>
+                        {currentRole === 'admin' ? 'Admin' : 'Worker'}
                       </span>
-                    ) : (
+                      {isProtected && (
+                        <span className="text-xs font-semibold text-blue-600 bg-blue-50 border border-blue-200 rounded-lg px-2 py-1">
+                          Protected
+                        </span>
+                      )}
+                    </div>
+                    </div>
+                    {!isProtected && (
+                      <div className="flex gap-2 mt-3">
+                        <button
+                          onClick={() => changeRole(email, currentRole === 'admin' ? 'worker' : 'admin')}
+                          disabled={updating === email}
+                          className="btn-secondary btn-sm flex-1"
+                        >
+                          {updating === email
+                            ? 'Updating...'
+                            : currentRole === 'admin'
+                              ? 'Make Worker'
+                              : 'Make Admin'
+                          }
+                        </button>
                       <button
                         onClick={() => removeEmail(email)}
-                        className="btn-danger btn-sm shrink-0"
+                          className="btn-danger btn-sm flex-1"
                       >
                         Remove
                       </button>
+                      </div>
                     )}
                   </li>
                 )

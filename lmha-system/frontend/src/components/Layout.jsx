@@ -7,6 +7,7 @@ export default function Layout({ children, title, back }) {
   const path = useLocation().pathname
 
   const switchLocation = () => {
+    localStorage.removeItem('lmha_location')
     setLocation(null)
     nav('/location')
   }
@@ -77,7 +78,7 @@ export default function Layout({ children, title, back }) {
             { to: '/cases', icon: '📋', label: 'Cases' },
             { to: '/schedule', icon: '📅', label: 'Schedule' },
             { to: '/metrics', icon: '📊', label: 'Metrics' },
-            { to: '/settings', icon: '⚙️', label: 'Settings' },
+            ...(user?.isAdmin ? [{ to: '/settings', icon: '⚙️', label: 'Settings' }] : []),
           ].map(({ to, icon, label }) => (
             <Link
               key={to}

@@ -3,7 +3,7 @@ services:
     name: lmha-backend
     runtime: node
     rootDir: backend
-    buildCommand: npm install
+    buildCommand: npm ci
     startCommand: npm start
     plan: free
     envVars:
@@ -31,3 +31,11 @@ services:
         generateValue: true
       - key: ALLOWED_EMAILS
         sync: false
+      - key: ADMIN_EMAILS
+        sync: false
+      - key: ROOT_ADMIN_EMAIL
+        sync: false
+      - key: FRONTEND_URLS
+        sync: false
+      - key: APP_TIME_ZONE
+        value: Europe/Dublin
