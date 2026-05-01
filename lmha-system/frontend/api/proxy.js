@@ -11,12 +11,35 @@ const HOP_BY_HOP_HEADERS = new Set([
   'upgrade',
 ]);
 
-function getBackendOrigin() {
-  const origin = process.env.BACKEND_PROXY_URL || process.env.VITE_API_URL || process.env.BACKEND_URL;
-  if (!origin) {
-    throw new Error('BACKEND_PROXY_URL is not configured');
+function normaliseOrigin(value) {
+  const raw = (value || '').trim();
+  if (!raw) return '';
+  try {
+    return new URL(raw).origin;
+  } catch {
+    return raw.replace(/\/+$/, '');
   }
-  return origin.replace(/\/+$/, '');
+}
+
+function getRequestOrigin(req) {
+  const host = req.headers.host || '';
+  if (!host) return '';
+  return normaliseOrigin(`https://${host}`);
+}
+
+function getBackendOrigin(req) {
+  const requestOrigin = getRequestOrigin(req);
+  const candidates = [
+    process.env.BACKEND_PROXY_URL,
+    process.env.VITE_API_URL,
+    process.env.BACKEND_URL,
+  ].map(normaliseOrigin).filter(Boolean);
+
+  const backendOrigin = candidates.find(origin => origin !== requestOrigin);
+  if (!backendOrigin) {
+    throw new Error('BACKEND_PROXY_URL must point to the Render backend origin, not the Vercel frontend origin');
+  }
+  return backendOrigin;
 }
 
 function getProxyPath(req) {
@@ -34,9 +57,9 @@ async function readBody(req) {
   return Buffer.concat(chunks);
 }
 
-module.exports = async function handler(req, res) {
+export default async function handler(req, res) {
   try {
-    const backendOrigin = getBackendOrigin();
+    const backendOrigin = getBackendOrigin(req);
     const proxyPath = getProxyPath(req).replace(/^\/+/, '');
     const incomingUrl = new URL(req.url, `https://${req.headers.host || 'localhost'}`);
     incomingUrl.searchParams.delete('path');
@@ -79,4 +102,4 @@ module.exports = async function handler(req, res) {
     res.setHeader('Content-Type', 'application/json');
     res.end(JSON.stringify({ error: err.message || 'Proxy failed' }));
   }
-};
+}
