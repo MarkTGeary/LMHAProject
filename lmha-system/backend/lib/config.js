@@ -4,8 +4,9 @@ const TOKEN_ISSUER = 'lmha-system';
 const TOKEN_AUDIENCE = 'lmha-staff';
 const AUTH_COOKIE_NAME = 'lmha_auth';
 const SESSION_HOURS = 8;
+const APP_TIME_ZONE = process.env.APP_TIME_ZONE || 'Europe/Dublin';
 
-process.env.TZ = process.env.APP_TIME_ZONE || 'Europe/Dublin';
+process.env.TZ = APP_TIME_ZONE;
 
 function splitList(value) {
   return (value || '')
@@ -124,7 +125,7 @@ function validateProductionEnv() {
   }
   if (!getAllowedEmailSeeds().length && !getRootAdminEmail()) missing.push('ALLOWED_EMAILS or ROOT_ADMIN_EMAIL');
   if ((process.env.SESSION_SECRET || '').length < 32) missing.push('SESSION_SECRET length >= 32');
-  if ((process.env.APP_TIME_ZONE || '') !== 'Europe/Dublin') missing.push('APP_TIME_ZONE=Europe/Dublin');
+  if (APP_TIME_ZONE !== 'Europe/Dublin') missing.push('APP_TIME_ZONE=Europe/Dublin');
 
   if (missing.length) {
     throw new Error(`Missing or invalid production environment: ${missing.join(', ')}`);
