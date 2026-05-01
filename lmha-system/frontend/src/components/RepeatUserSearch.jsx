@@ -32,7 +32,7 @@ export default function RepeatUserSearch({ onSelect, onClear }) {
     setQuery('')
     onSelect(user)
     try {
-      const r = await apiFetch(`/api/bookings?service_user_id=${user.id}`)
+      const r = await apiFetch(`/api/service-users/${user.id}/bookings`)
       const data = await r.json()
       setHistory(Array.isArray(data) ? data : [])
     } catch {

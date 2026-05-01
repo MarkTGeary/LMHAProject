@@ -1,6 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { createContext, useContext, useState, useEffect } from 'react'
-import { apiFetch } from './lib/api'
+import { apiFetch, setCsrfToken } from './lib/api'
 import Login from './pages/Login'
 import LocationSelect from './pages/LocationSelect'
 import Dashboard from './pages/Dashboard'
@@ -33,36 +33,50 @@ function RequireLocation({ children }) {
   return children
 }
 
+function RequireAdmin({ children }) {
+  const { user, loading } = useAuth()
+  if (loading) return <div className="flex items-center justify-center h-screen text-xl text-gray-500">Loading...</div>
+  if (!user) return <Navigate to="/login" replace />
+  if (!user.isAdmin) return <Navigate to="/" replace />
+  return children
+}
+
 export default function App() {
   const [user, setUser] = useState(null)
   const [location, setLocation] = useState(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    // Capture token from URL after OAuth redirect
-    const params = new URLSearchParams(window.location.search)
-    const urlToken = params.get('token')
-    if (urlToken) {
-      localStorage.setItem('lmha_token', urlToken)
-      window.history.replaceState({}, '', window.location.pathname)
-    }
-
     // Restore location from localStorage
     const storedLocation = localStorage.getItem('lmha_location')
-    if (storedLocation) setLocation(storedLocation)
+    if (['LMHA', 'Solace Café'].includes(storedLocation)) setLocation(storedLocation)
 
     apiFetch('/auth/me')
-      .then(r => r.json())
-      .then(data => {
-        if (data.email) setUser(data)
+      .then(r => {
+        if (!r.ok) throw new Error('Not authenticated')
+        return r.json()
       })
-      .catch(() => {})
+      .then(data => {
+        if (data.email) {
+          setUser(data)
+          setCsrfToken(data.csrfToken)
+        }
+      })
+      .catch(() => {
+        setUser(null)
+        setCsrfToken(null)
+      })
       .finally(() => setLoading(false))
   }, [])
 
-  const logout = () => {
-    localStorage.removeItem('lmha_token')
+  const logout = async () => {
+    try {
+      await apiFetch('/auth/logout', { method: 'POST' })
+    } catch {
+      // Local logout should still happen if the network is down.
+    }
     localStorage.removeItem('lmha_location')
+    setCsrfToken(null)
     setUser(null)
     setLocation(null)
   }
@@ -100,7 +114,7 @@ export default function App() {
             <RequireLocation><MetricsDashboard /></RequireLocation>
           } />
           <Route path="/settings" element={
-            <RequireAuth><Settings /></RequireAuth>
+            <RequireAdmin><Settings /></RequireAdmin>
           } />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

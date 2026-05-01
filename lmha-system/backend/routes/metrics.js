@@ -1,20 +1,23 @@
 const express = require('express');
 const router = express.Router();
-const { requireAuth } = require('../middleware/requireAuth');
 const { aggregateMetrics } = require('../services/metricsAggregator');
 const { writeMetrics, readMetrics } = require('../services/googleSheets');
 const db = require('../db');
+const { ApiError, badRequest } = require('../lib/errors');
+const { assertRequestLocation, countInt, parseDateString } = require('../lib/validation');
+
+function parseDateRange(input) {
+  const start = parseDateString(input.start, 'start');
+  const end = parseDateString(input.end, 'end');
+  if (start > end) throw badRequest('start must be before or equal to end');
+  return { start, end };
+}
 
 // GET /api/metrics/preview?location=&start=&end=
-router.get('/preview', requireAuth, async (req, res, next) => {
+router.get('/preview', async (req, res, next) => {
   try {
-    const { location, start, end } = req.query;
-    if (!location || !start || !end) {
-      return res.status(400).json({ error: 'location, start, and end are required' });
-    }
-    if (location !== req.headers['x-location']) {
-      return res.status(403).json({ error: 'Location does not match your current session' });
-    }
+    const location = assertRequestLocation(req, req.query.location);
+    const { start, end } = parseDateRange(req.query);
 
     const metrics = await aggregateMetrics(location, start, end);
     const fbResult = await db.execute({
@@ -30,15 +33,10 @@ router.get('/preview', requireAuth, async (req, res, next) => {
 });
 
 // POST /api/metrics/submit
-router.post('/submit', requireAuth, async (req, res, next) => {
+router.post('/submit', async (req, res, next) => {
   try {
-    const { location, start, end } = req.body;
-    if (!location || !start || !end) {
-      return res.status(400).json({ error: 'location, start, and end are required' });
-    }
-    if (location !== req.headers['x-location']) {
-      return res.status(403).json({ error: 'Location does not match your current session' });
-    }
+    const location = assertRequestLocation(req, req.body.location);
+    const { start, end } = parseDateRange(req.body);
 
     const metrics = await aggregateMetrics(location, start, end);
     const fbResult = await db.execute({
@@ -50,35 +48,28 @@ router.post('/submit', requireAuth, async (req, res, next) => {
     res.json({ ok: true, result, metrics: { ...metrics, feedback } });
   } catch (err) {
     console.error('[Metrics] Submit error:', err);
-    res.status(500).json({ error: err.message || 'Metrics submission failed' });
+    next(err instanceof ApiError ? err : new ApiError(502, 'Metrics submission failed'));
   }
 });
 
 // GET /api/metrics/read?location=&start=&end=
-router.get('/read', requireAuth, async (req, res, next) => {
+router.get('/read', async (req, res, next) => {
   try {
-    const { location, start, end } = req.query;
-    if (!location || !start || !end) {
-      return res.status(400).json({ error: 'location, start, and end are required' });
-    }
-    if (location !== req.headers['x-location']) {
-      return res.status(403).json({ error: 'Location does not match your current session' });
-    }
+    const location = assertRequestLocation(req, req.query.location);
+    const { start, end } = parseDateRange(req.query);
     const metrics = await readMetrics(location, start, end);
     res.json(metrics);
   } catch (err) {
     console.error('[Metrics] Read error:', err);
-    res.status(500).json({ error: err.message || 'Failed to read metrics from Google Sheets' });
+    next(err instanceof ApiError ? err : new ApiError(502, 'Failed to read metrics from Google Sheets'));
   }
 });
 
 // GET /api/metrics/feedback?location=&week_start=
-router.get('/feedback', requireAuth, async (req, res, next) => {
+router.get('/feedback', async (req, res, next) => {
   try {
-    const { location, week_start } = req.query;
-    if (!location || !week_start) {
-      return res.status(400).json({ error: 'location and week_start are required' });
-    }
+    const location = assertRequestLocation(req, req.query.location);
+    const week_start = parseDateString(req.query.week_start, 'week_start');
     const result = await db.execute({
       sql: 'SELECT * FROM feedback_logs WHERE location = ? AND week_start = ?',
       args: [location, week_start],
@@ -88,12 +79,14 @@ router.get('/feedback', requireAuth, async (req, res, next) => {
 });
 
 // POST /api/metrics/feedback
-router.post('/feedback', requireAuth, async (req, res, next) => {
+router.post('/feedback', async (req, res, next) => {
   try {
-    const { location, week_start, thankyou_letters, verbal_feedback, testimonials, vox_pop } = req.body;
-    if (!location || !week_start) {
-      return res.status(400).json({ error: 'location and week_start are required' });
-    }
+    const location = assertRequestLocation(req, req.body.location);
+    const week_start = parseDateString(req.body.week_start, 'week_start');
+    const thankyou_letters = countInt(req.body.thankyou_letters, 'thankyou_letters');
+    const verbal_feedback = countInt(req.body.verbal_feedback, 'verbal_feedback');
+    const testimonials = countInt(req.body.testimonials, 'testimonials');
+    const vox_pop = countInt(req.body.vox_pop, 'vox_pop');
     await db.execute({
       sql: `INSERT INTO feedback_logs (location, week_start, thankyou_letters, verbal_feedback, testimonials, vox_pop, updated_at)
             VALUES (?, ?, ?, ?, ?, ?, datetime('now'))
@@ -103,7 +96,7 @@ router.post('/feedback', requireAuth, async (req, res, next) => {
               testimonials     = excluded.testimonials,
               vox_pop          = excluded.vox_pop,
               updated_at       = excluded.updated_at`,
-      args: [location, week_start, thankyou_letters ?? 0, verbal_feedback ?? 0, testimonials ?? 0, vox_pop ?? 0],
+      args: [location, week_start, thankyou_letters, verbal_feedback, testimonials, vox_pop],
     });
     res.json({ ok: true });
   } catch (err) { next(err); }

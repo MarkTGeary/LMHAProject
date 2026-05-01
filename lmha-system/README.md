@@ -51,9 +51,15 @@ Open http://localhost:5173
 In `backend/.env`, set:
 ```
 ALLOWED_EMAILS=staff1@lmha.ie,staff2@lmha.ie
+ADMIN_EMAILS=supervisor@lmha.ie
+ROOT_ADMIN_EMAIL=supervisor@lmha.ie
+APP_TIME_ZONE=Europe/Dublin
 ```
 
 Only these Google accounts can log in.
+Admins can manage the account list in Settings. `ROOT_ADMIN_EMAIL` is always
+kept as an admin and cannot be removed or demoted; if it is blank, the first
+`ADMIN_EMAILS` address is used, then the first `ALLOWED_EMAILS` address.
 
 ## Setup: Google Sheets
 
@@ -90,8 +96,8 @@ Login (Google OAuth)
 
 ## Data
 
-- SQLite database: `backend/lmha.db`
-- Sessions: `backend/sessions.db`
+- Database: Turso/libSQL (`TURSO_DATABASE_URL` + `TURSO_AUTH_TOKEN`)
+- Auth: Google OAuth issues an 8-hour `HttpOnly` cookie with CSRF protection
 - **No records are ever deleted.** Cancellations set `status = 'Cancelled'`.
 
 ---
