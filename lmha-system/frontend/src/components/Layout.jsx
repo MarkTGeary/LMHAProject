@@ -1,10 +1,16 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { useRef, useState } from 'react'
 import { useAuth } from '../App'
 
 export default function Layout({ children, title, back }) {
   const { user, location, logout, setLocation } = useAuth()
   const nav = useNavigate()
   const path = useLocation().pathname
+  const [menuOpen, setMenuOpen] = useState(false)
+  const closeTimer = useRef(null)
+
+  const openMenu = () => { clearTimeout(closeTimer.current); setMenuOpen(true) }
+  const scheduleClose = () => { closeTimer.current = setTimeout(() => setMenuOpen(false), 600) }
 
   const switchLocation = () => {
     localStorage.removeItem('lmha_location')
@@ -45,7 +51,7 @@ export default function Layout({ children, title, back }) {
             {location}
           </button>
 
-          <div className="relative group">
+          <div className="relative" onMouseEnter={openMenu} onMouseLeave={scheduleClose}>
             <button className="min-h-[40px] min-w-[40px] flex items-center justify-center rounded-xl hover:bg-gray-100">
               {user?.picture
                 ? <img src={user.picture} className="w-8 h-8 rounded-full" alt="" />
@@ -54,12 +60,14 @@ export default function Layout({ children, title, back }) {
                   </div>
               }
             </button>
-            <div className="hidden group-hover:flex absolute right-0 top-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg py-1 min-w-[160px] flex-col z-50">
-              <div className="px-4 py-2 text-xs text-gray-500 border-b border-gray-100">{user?.email}</div>
-              <button onClick={logout} className="px-4 py-2 text-sm text-red-600 hover:bg-red-50 text-left">
-                Sign out
-              </button>
-            </div>
+            {menuOpen && (
+              <div className="absolute right-0 top-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg py-1 min-w-[160px] flex flex-col z-50">
+                <div className="px-4 py-2 text-xs text-gray-500 border-b border-gray-100">{user?.email}</div>
+                <button onClick={logout} className="px-4 py-2 text-sm text-red-600 hover:bg-red-50 text-left">
+                  Sign out
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </header>

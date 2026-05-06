@@ -53,7 +53,7 @@ async function requireLocation(req, res, next) {
   try {
     await requireAuth(req, res, err => {
       if (err) return next(err);
-      const location = req.headers['x-location'];
+      const location = decodeURIComponent(req.headers['x-location'] || '');
       if (!['LMHA', 'Solace Café'].includes(location)) {
         return res.status(403).json({ error: 'No location selected' });
       }

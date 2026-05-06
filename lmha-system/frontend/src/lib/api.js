@@ -16,7 +16,7 @@ export function apiFetch(path, options = {}) {
   const method = (options.method || 'GET').toUpperCase();
   const headers = {
     ...options.headers,
-    ...(location ? { 'X-Location': location } : {}),
+    ...(location ? { 'X-Location': encodeURIComponent(location) } : {}),
   };
   if (!['GET', 'HEAD', 'OPTIONS'].includes(method) && csrfToken) {
     headers['X-CSRF-Token'] = csrfToken;
