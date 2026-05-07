@@ -25,7 +25,7 @@ function isDayValid(dateStr, location) {
 }
 
 export default function NewBooking({ editMode }) {
-  const { location } = useAuth()
+  const { location, user } = useAuth()
   const navigate = useNavigate()
   const { id } = useParams()
 
@@ -42,6 +42,7 @@ export default function NewBooking({ editMode }) {
     full_name: '',
     phone: '',
     service_user_id: null,
+    assigned_to: user?.email || null,
   })
   const [slots, setSlots] = useState([])
   const [slotsLoading, setSlotsLoading] = useState(false)
@@ -51,6 +52,17 @@ export default function NewBooking({ editMode }) {
   const [saving, setSaving] = useState(false)
   const [existingUser, setExistingUser] = useState(null)
   const [isLocked, setIsLocked] = useState(false)
+  const [staffList, setStaffList] = useState([])
+  const [assignSearch, setAssignSearch] = useState('')
+  const [assignDropdownOpen, setAssignDropdownOpen] = useState(false)
+
+  // Fetch staff list for assignment autocomplete
+  useEffect(() => {
+    apiFetch('/api/bookings/staff')
+      .then(r => r.json())
+      .then(data => setStaffList(Array.isArray(data) ? data.map(s => s.email) : []))
+      .catch(() => {})
+  }, [])
 
   // Load booking for edit mode
   useEffect(() => {
@@ -75,6 +87,7 @@ export default function NewBooking({ editMode }) {
             full_name: b.full_name || '',
             phone: b.phone || '',
             service_user_id: b.service_user_id,
+            assigned_to: b.assigned_to || null,
           })
         })
     }
@@ -154,6 +167,9 @@ export default function NewBooking({ editMode }) {
   }
 
   const dayInvalid = form.date && !isDayValid(form.date, form.location)
+  const filteredStaff = staffList.filter(e =>
+    !assignSearch || e.toLowerCase().includes(assignSearch.toLowerCase())
+  )
 
   return (
     <Layout title={editMode ? 'Edit Booking' : 'New Booking'} back="/cases">
@@ -314,6 +330,46 @@ export default function NewBooking({ editMode }) {
                 </button>
               ))}
             </div>
+          </div>
+
+          <div className="field">
+            <label className="label">Assign To</label>
+            <div className="relative">
+              <input
+                className="input"
+                value={assignSearch}
+                onChange={e => { setAssignSearch(e.target.value); setAssignDropdownOpen(true) }}
+                onFocus={() => { setAssignSearch(''); setAssignDropdownOpen(true) }}
+                onBlur={() => setTimeout(() => setAssignDropdownOpen(false), 150)}
+                placeholder={form.assigned_to ? form.assigned_to : 'Assign Later — type to search'}
+              />
+              {assignDropdownOpen && (
+                <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg max-h-52 overflow-y-auto">
+                  <button
+                    type="button"
+                    className="w-full text-left px-4 py-2.5 hover:bg-gray-50 text-sm text-gray-500 border-b border-gray-100"
+                    onMouseDown={() => { set('assigned_to', null); setAssignSearch(''); setAssignDropdownOpen(false) }}
+                  >
+                    — Assign Later
+                  </button>
+                  {filteredStaff.map(email => (
+                    <button
+                      key={email}
+                      type="button"
+                      className={'w-full text-left px-4 py-2.5 hover:bg-blue-50 text-sm' + (form.assigned_to === email ? ' bg-blue-50 font-semibold' : '')}
+                      onMouseDown={() => { set('assigned_to', email); setAssignSearch(''); setAssignDropdownOpen(false) }}
+                    >
+                      {email}{email === user?.email ? ' (you)' : ''}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+            <p className="text-xs text-gray-400 mt-1.5">
+              {form.assigned_to
+                ? <>Assigned to <strong className="text-gray-600">{form.assigned_to}</strong> — will appear on their schedule</>
+                : 'Not assigned — will not appear on anyone\'s schedule until assigned'}
+            </p>
           </div>
         </div>
 

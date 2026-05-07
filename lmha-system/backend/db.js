@@ -186,6 +186,15 @@ async function initAndMigrate() {
     await auditAndBackfillBookingLocks();
   }
 
+  // ── Migration: bookings.assigned_to ──────────────────────────────
+  const bookingColsResult = await _client.execute('PRAGMA table_info(bookings)');
+  const bookingCols = bookingColsResult.rows.map(r => r.name);
+  if (!bookingCols.includes('assigned_to')) {
+    console.log('[DB] Running migration: adding bookings.assigned_to...');
+    await _client.execute('ALTER TABLE bookings ADD COLUMN assigned_to TEXT');
+    console.log('[DB] Migration complete: bookings.assigned_to added.');
+  }
+
   console.log('[DB] Init and migrations complete.');
 }
 

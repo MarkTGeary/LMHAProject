@@ -246,6 +246,14 @@ router.get('/available-slots', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// GET /api/bookings/staff - list allowed staff emails for assignment autocomplete
+router.get('/staff', async (req, res, next) => {
+  try {
+    const result = await db.execute('SELECT email, role FROM allowed_emails ORDER BY email');
+    res.json(result.rows);
+  } catch (err) { next(err); }
+});
+
 // GET /api/bookings/:id
 router.get('/:id', async (req, res, next) => {
   try {
@@ -283,6 +291,7 @@ router.post('/', async (req, res, next) => {
     const peer_support_worker = normaliseString(req.body.peer_support_worker, 'peer_support_worker', { max: 200 });
     const limitations = normaliseString(req.body.limitations, 'limitations', { max: 5000 });
     const notes = normaliseString(req.body.notes, 'notes', { max: 5000 });
+    const assigned_to = req.body.assigned_to ? normaliseString(req.body.assigned_to, 'assigned_to', { max: 200 }) : null;
 
     const timeValid = validateBookingTime(location, date, time_booked);
     if (!timeValid.valid) return res.status(400).json({ error: timeValid.error });
@@ -313,7 +322,7 @@ router.post('/', async (req, res, next) => {
     const bookingArgs = [
       location, date, time_booked, interaction_type,
       new_or_repeat, referred_from, type_of_support, carer_attended,
-      peer_support_worker, limitations, notes, req.user.email,
+      peer_support_worker, limitations, notes, req.user.email, assigned_to,
     ];
     const serviceUserSql = serviceUserId ? '?' : 'last_insert_rowid()';
     if (serviceUserId) bookingArgs.unshift(serviceUserId);
@@ -323,8 +332,8 @@ router.post('/', async (req, res, next) => {
       sql: `INSERT INTO bookings (
               service_user_id, location, date, time_booked, interaction_type,
               new_or_repeat, referred_from, type_of_support, carer_attended,
-              peer_support_worker, limitations, notes, outcome, status, created_by
-            ) VALUES (${serviceUserSql}, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Pending', 'Active', ?)`,
+              peer_support_worker, limitations, notes, outcome, status, created_by, assigned_to
+            ) VALUES (${serviceUserSql}, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Pending', 'Active', ?, ?)`,
       args: bookingArgs,
     });
     statements.push(...lockInsertStatements(location, date, time_booked));
@@ -376,6 +385,7 @@ router.patch('/:id', async (req, res, next) => {
     if (hasOwn(req.body, 'status')) values.status = enumValue(req.body.status, STATUSES, 'status');
     if (hasOwn(req.body, 'ed_diversion')) values.ed_diversion = booleanInt(req.body.ed_diversion, 'ed_diversion', { nullable: true });
     if (hasOwn(req.body, 'service_user_id')) values.service_user_id = parseId(req.body.service_user_id, 'service_user_id', { required: false });
+    if (hasOwn(req.body, 'assigned_to')) values.assigned_to = req.body.assigned_to ? normaliseString(req.body.assigned_to, 'assigned_to', { max: 200 }) : null;
 
     const newDate = values.date ?? existing.date;
     const newTime = values.time_booked ?? existing.time_booked;

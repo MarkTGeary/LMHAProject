@@ -66,14 +66,17 @@ export default function WeeklySchedule() {
   const todayStr = fmt(new Date())
 
   const workers = useMemo(
-    () => [...new Set(bookings.map(b => b.created_by).filter(Boolean))].sort(),
+    () => [...new Set(bookings.map(b => b.assigned_to).filter(Boolean))].sort(),
     [bookings]
   )
 
+  const hasUnassigned = useMemo(() => bookings.some(b => !b.assigned_to), [bookings])
+
   const displayBookings = useMemo(() => {
     if (viewFilter === 'all') return bookings
+    if (viewFilter === 'unassigned') return bookings.filter(b => !b.assigned_to)
     const email = viewFilter === 'mine' ? user?.email : viewFilter
-    return bookings.filter(b => b.created_by === email)
+    return bookings.filter(b => b.assigned_to === email)
   }, [bookings, viewFilter, user])
 
   const byDate = {}
@@ -133,6 +136,14 @@ export default function WeeklySchedule() {
           >
             All
           </button>
+          {hasUnassigned && (
+            <button
+              onClick={() => setViewFilter('unassigned')}
+              className={'btn-sm ' + (viewFilter === 'unassigned' ? 'btn-primary' : 'btn-secondary')}
+            >
+              Unassigned
+            </button>
+          )}
           {workers.filter(w => w !== user?.email).map(w => (
             <button
               key={w}
@@ -266,6 +277,12 @@ export default function WeeklySchedule() {
                   {' at '}<strong>{selected.time_booked}</strong>
                 </div>
                 <div className="text-sm text-gray-500 mt-0.5">{selected.interaction_type} · {selected.new_or_repeat}</div>
+                <div className="text-sm mt-0.5">
+                  {selected.assigned_to
+                    ? <span className="text-blue-600">Assigned to: <strong>{selected.assigned_to}</strong></span>
+                    : <span className="text-gray-400 italic">Unassigned</span>
+                  }
+                </div>
               </div>
               <button onClick={() => setSelected(null)} className="text-3xl text-gray-400 hover:text-gray-700">x</button>
             </div>
@@ -329,7 +346,9 @@ export default function WeeklySchedule() {
         {!loading && displayBookings.length === 0 && (
           <div className="card text-center py-10">
             <div className="text-gray-500 text-lg">
-              {viewFilter === 'mine' ? 'No bookings in your schedule this week' : 'No bookings this week'}
+              {viewFilter === 'mine' ? 'No bookings assigned to you this week'
+              : viewFilter === 'unassigned' ? 'No unassigned bookings this week'
+              : 'No bookings this week'}
             </div>
             <Link to="/bookings/new" className="btn-primary mt-4 inline-flex">New Booking</Link>
           </div>
