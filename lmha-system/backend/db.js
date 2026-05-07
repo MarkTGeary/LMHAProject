@@ -179,13 +179,6 @@ async function initAndMigrate() {
 
   await migrateAllowedEmailRoles();
 
-  const lockTablesResult = await _client.execute(
-    "SELECT name FROM sqlite_master WHERE type='table' AND name='booking_slot_locks'"
-  );
-  if (lockTablesResult.rows.length) {
-    await auditAndBackfillBookingLocks();
-  }
-
   // ── Migration: bookings.assigned_to ──────────────────────────────
   const bookingColsResult = await _client.execute('PRAGMA table_info(bookings)');
   const bookingCols = bookingColsResult.rows.map(r => r.name);
@@ -194,6 +187,27 @@ async function initAndMigrate() {
     await _client.execute('ALTER TABLE bookings ADD COLUMN assigned_to TEXT');
     console.log('[DB] Migration complete: bookings.assigned_to added.');
   }
+
+  // ── Migration: booking_slot_locks → per-worker PK ────────────────
+  const slotLockColsResult = await _client.execute('PRAGMA table_info(booking_slot_locks)');
+  const slotLockCols = slotLockColsResult.rows.map(r => r.name);
+  if (!slotLockCols.includes('assigned_to')) {
+    console.log('[DB] Running migration: recreating booking_slot_locks with per-worker PK...');
+    await _client.executeMultiple(`
+      DROP TABLE IF EXISTS booking_slot_locks;
+      CREATE TABLE booking_slot_locks (
+        location TEXT NOT NULL,
+        date TEXT NOT NULL,
+        slot_time TEXT NOT NULL,
+        assigned_to TEXT NOT NULL DEFAULT '',
+        booking_id INTEGER NOT NULL REFERENCES bookings(id) ON DELETE CASCADE,
+        PRIMARY KEY (location, date, slot_time, assigned_to)
+      ) WITHOUT ROWID
+    `);
+    console.log('[DB] Migration complete: booking_slot_locks per-worker PK.');
+  }
+
+  await auditAndBackfillBookingLocks();
 
   console.log('[DB] Init and migrations complete.');
 }
@@ -237,8 +251,9 @@ async function migrateAllowedEmailRoles() {
 }
 
 async function auditAndBackfillBookingLocks() {
+  // Conflicts are only meaningful within the same assigned worker
   const conflicts = await _client.execute(`
-    SELECT a.id AS id1, b.id AS id2, a.location, a.date, a.time_booked AS time1, b.time_booked AS time2
+    SELECT a.id AS id1, b.id AS id2, a.location, a.date, a.time_booked AS time1, b.time_booked AS time2, a.assigned_to
     FROM bookings a
     JOIN bookings b
       ON b.id > a.id
@@ -246,6 +261,9 @@ async function auditAndBackfillBookingLocks() {
      AND b.date = a.date
      AND b.status != 'Cancelled'
      AND a.status != 'Cancelled'
+     AND a.assigned_to IS NOT NULL
+     AND b.assigned_to IS NOT NULL
+     AND a.assigned_to = b.assigned_to
     WHERE ABS(
       (CAST(substr(a.time_booked, 1, 2) AS INTEGER) * 60 + CAST(substr(a.time_booked, 4, 2) AS INTEGER)) -
       (CAST(substr(b.time_booked, 1, 2) AS INTEGER) * 60 + CAST(substr(b.time_booked, 4, 2) AS INTEGER))
@@ -253,24 +271,25 @@ async function auditAndBackfillBookingLocks() {
   `);
 
   if (conflicts.rows.length) {
-    console.warn(`[DB] Booking slot audit found ${conflicts.rows.length} existing conflict(s). New writes will be locked; review legacy records manually.`);
+    console.warn(`[DB] Booking slot audit found ${conflicts.rows.length} per-worker conflict(s). Review legacy records manually.`);
     for (const row of conflicts.rows.slice(0, 10)) {
-      console.warn(`[DB] Conflict: booking ${row.id1} (${row.time1}) and ${row.id2} (${row.time2}) on ${row.date} at ${row.location}`);
+      console.warn(`[DB] Conflict: booking ${row.id1} (${row.time1}) and ${row.id2} (${row.time2}) on ${row.date} at ${row.location} for ${row.assigned_to}`);
     }
   }
 
   const activeBookings = await _client.execute(`
-    SELECT id, location, date, time_booked
+    SELECT id, location, date, time_booked, assigned_to
     FROM bookings
     WHERE status != 'Cancelled'
   `);
 
   for (const booking of activeBookings.rows) {
+    const assignedTo = booking.assigned_to || '';
     for (const slot of slotsForBooking(booking.time_booked)) {
       await _client.execute({
-        sql: `INSERT OR IGNORE INTO booking_slot_locks (location, date, slot_time, booking_id)
-              VALUES (?, ?, ?, ?)`,
-        args: [booking.location, booking.date, slot, booking.id],
+        sql: `INSERT OR IGNORE INTO booking_slot_locks (location, date, slot_time, assigned_to, booking_id)
+              VALUES (?, ?, ?, ?, ?)`,
+        args: [booking.location, booking.date, slot, assignedTo, booking.id],
       });
     }
   }

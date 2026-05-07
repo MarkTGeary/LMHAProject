@@ -233,23 +233,38 @@ export default function WeeklySchedule() {
                           </div>
                         )}
 
-                        {dayBookings.map(b => {
-                          const topPx = ((timeToMins(b.time_booked) - startMins) / 60) * ROW_PX + 2
-                          const isSel = selected && selected.id === b.id
-                          return (
-                            <button key={b.id}
-                              onClick={() => setSelected(isSel ? null : b)}
-                              className={'absolute inset-x-1 rounded-lg border text-left px-2 py-1 overflow-hidden hover:brightness-90 z-10 ' + getColor(b) + (isSel ? ' ring-2 ring-yellow-300 ring-offset-1' : '')}
-                              style={{ top: topPx, height: ROW_PX - 4 }}
-                            >
-                              <div className="font-bold text-xs leading-tight truncate">{b.full_name || 'Unknown'}</div>
-                              <div className="text-xs opacity-80">{b.time_booked}</div>
-                              {!b.intake_complete && b.status === 'Active' && (
-                                <div className="text-xs font-bold">no intake</div>
-                              )}
-                            </button>
-                          )
-                        })}
+                        {(() => {
+                          const groups = {}
+                          dayBookings.forEach(b => {
+                            if (!groups[b.time_booked]) groups[b.time_booked] = []
+                            groups[b.time_booked].push(b)
+                          })
+                          return dayBookings.map(b => {
+                            const group = groups[b.time_booked]
+                            const colIndex = group.indexOf(b)
+                            const colCount = group.length
+                            const topPx = ((timeToMins(b.time_booked) - startMins) / 60) * ROW_PX + 2
+                            const isSel = selected && selected.id === b.id
+                            return (
+                              <button key={b.id}
+                                onClick={() => setSelected(isSel ? null : b)}
+                                className={'absolute rounded-lg border text-left px-1.5 py-1 overflow-hidden hover:brightness-90 z-10 ' + getColor(b) + (isSel ? ' ring-2 ring-yellow-300 ring-offset-1' : '')}
+                                style={{
+                                  top: topPx,
+                                  height: ROW_PX - 4,
+                                  left: `calc(${(colIndex / colCount) * 100}% + 2px)`,
+                                  width: `calc(${(1 / colCount) * 100}% - 4px)`,
+                                }}
+                              >
+                                <div className="font-bold text-xs leading-tight truncate">{b.full_name || 'Unknown'}</div>
+                                <div className="text-xs opacity-80">{b.time_booked}</div>
+                                {!b.intake_complete && b.status === 'Active' && colCount === 1 && (
+                                  <div className="text-xs font-bold">no intake</div>
+                                )}
+                              </button>
+                            )
+                          })
+                        })()}
 
                         {dayBookings.length === 0 && (
                           <Link to="/bookings/new"

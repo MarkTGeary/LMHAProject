@@ -100,7 +100,8 @@ export default function NewBooking({ editMode }) {
 
     setSlotsLoading(true)
     setEmergencyMode(false)
-    apiFetch(`/api/bookings/available-slots?date=${form.date}&location=${encodeURIComponent(form.location)}`)
+    const assigneeParam = form.assigned_to ? '&assigned_to=' + encodeURIComponent(form.assigned_to) : ''
+    apiFetch(`/api/bookings/available-slots?date=${form.date}&location=${encodeURIComponent(form.location)}${assigneeParam}`)
       .then(r => r.json())
       .then(data => {
         setSlots(data.slots || [])
@@ -108,7 +109,7 @@ export default function NewBooking({ editMode }) {
       })
       .catch(() => { setSlots([]); setSessionInfo(null) })
       .finally(() => setSlotsLoading(false))
-  }, [form.date, form.location])
+  }, [form.date, form.location, form.assigned_to])
 
   const set = (field, value) => setForm(f => ({ ...f, [field]: value }))
 

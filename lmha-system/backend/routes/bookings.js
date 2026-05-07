@@ -83,7 +83,8 @@ function validateBookingTime(location, dateStr, timeStr, allowPast = false) {
   return { valid: true };
 }
 
-async function checkDoubleBooking(location, dateStr, timeStr, excludeId = null) {
+async function checkDoubleBooking(location, dateStr, timeStr, assignedTo, excludeId = null) {
+  if (!assignedTo) return { conflict: false };
   const newMins = timeToMinutes(timeStr);
   const result = await db.execute({
     sql: `SELECT b.id, b.time_booked, b.service_user_id,
@@ -91,8 +92,9 @@ async function checkDoubleBooking(location, dateStr, timeStr, excludeId = null) 
           FROM bookings b
           LEFT JOIN service_users su ON su.id = b.service_user_id
           WHERE b.location = ? AND b.date = ? AND b.status != 'Cancelled'
+          AND b.assigned_to = ?
           ${excludeId ? 'AND b.id != ?' : ''}`,
-    args: excludeId ? [location, dateStr, excludeId] : [location, dateStr],
+    args: excludeId ? [location, dateStr, assignedTo, excludeId] : [location, dateStr, assignedTo],
   });
 
   for (const b of result.rows) {
@@ -100,18 +102,19 @@ async function checkDoubleBooking(location, dateStr, timeStr, excludeId = null) 
     if (Math.abs(newMins - bMins) < 60) {
       return {
         conflict: true,
-        message: `Conflicts with existing booking at ${b.time_booked}${b.name ? ' for ' + b.name : ''}`,
+        message: `Conflicts with ${assignedTo}'s existing booking at ${b.time_booked}${b.name ? ' for ' + b.name : ''}`,
       };
     }
   }
   return { conflict: false };
 }
 
-function lockInsertStatements(location, date, time, bookingIdSql = 'last_insert_rowid()', bookingIdArgs = []) {
+function lockInsertStatements(location, date, time, assignedTo, bookingIdSql = 'last_insert_rowid()', bookingIdArgs = []) {
+  if (!assignedTo) return [];
   return slotsForBooking(time).map(slot => ({
-    sql: `INSERT INTO booking_slot_locks (location, date, slot_time, booking_id)
-          VALUES (?, ?, ?, ${bookingIdSql})`,
-    args: [location, date, slot, ...bookingIdArgs],
+    sql: `INSERT INTO booking_slot_locks (location, date, slot_time, assigned_to, booking_id)
+          VALUES (?, ?, ?, ?, ${bookingIdSql})`,
+    args: [location, date, slot, assignedTo, ...bookingIdArgs],
   }));
 }
 
@@ -211,11 +214,17 @@ router.get('/available-slots', async (req, res, next) => {
       return res.json({ available: false, reason: `${currentLocation} is closed on this day`, slots: [] });
     }
 
-    const result = await db.execute({
-      sql: `SELECT slot_time FROM booking_slot_locks WHERE location = ? AND date = ?`,
-      args: [currentLocation, date],
-    });
-    const locked = new Set(result.rows.map(r => r.slot_time));
+    const requestedAssignee = req.query.assigned_to || null;
+    let locked;
+    if (requestedAssignee) {
+      const result = await db.execute({
+        sql: `SELECT slot_time FROM booking_slot_locks WHERE location = ? AND date = ? AND assigned_to = ?`,
+        args: [currentLocation, date, requestedAssignee],
+      });
+      locked = new Set(result.rows.map(r => r.slot_time));
+    } else {
+      locked = new Set();
+    }
 
     let slots = [];
     if (rules.standardSlots) {
@@ -296,7 +305,7 @@ router.post('/', async (req, res, next) => {
     const timeValid = validateBookingTime(location, date, time_booked);
     if (!timeValid.valid) return res.status(400).json({ error: timeValid.error });
 
-    const existingConflict = await checkDoubleBooking(location, date, time_booked);
+    const existingConflict = await checkDoubleBooking(location, date, time_booked, assigned_to);
     if (existingConflict.conflict) throw conflict(existingConflict.message);
 
     const locationRules = LOCATION_RULES[location];
@@ -336,7 +345,7 @@ router.post('/', async (req, res, next) => {
             ) VALUES (${serviceUserSql}, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Pending', 'Active', ?, ?)`,
       args: bookingArgs,
     });
-    statements.push(...lockInsertStatements(location, date, time_booked));
+    statements.push(...lockInsertStatements(location, date, time_booked, assigned_to));
 
     const batchResult = await db.batch(statements, 'write').catch(err => { throw toLockConflict(err); });
     const bookingId = Number(batchResult[bookingIndex].lastInsertRowid);
@@ -390,10 +399,11 @@ router.patch('/:id', async (req, res, next) => {
     const newDate = values.date ?? existing.date;
     const newTime = values.time_booked ?? existing.time_booked;
     const newStatus = values.status ?? existing.status;
-    if (hasOwn(values, 'date') || hasOwn(values, 'time_booked')) {
+    const newAssignedTo = hasOwn(values, 'assigned_to') ? values.assigned_to : existing.assigned_to;
+    if (hasOwn(values, 'date') || hasOwn(values, 'time_booked') || hasOwn(values, 'assigned_to')) {
       const timeValid = validateBookingTime(existing.location, newDate, newTime, true);
       if (!timeValid.valid) return res.status(400).json({ error: timeValid.error });
-      const existingConflict = await checkDoubleBooking(existing.location, newDate, newTime, id);
+      const existingConflict = await checkDoubleBooking(existing.location, newDate, newTime, newAssignedTo, id);
       if (existingConflict.conflict) throw conflict(existingConflict.message);
     }
 
@@ -427,7 +437,7 @@ router.patch('/:id', async (req, res, next) => {
       { sql: `UPDATE bookings SET ${sets.join(', ')} WHERE id = ?`, args },
     ];
     if (newStatus !== 'Cancelled') {
-      statements.push(...lockInsertStatements(existing.location, newDate, newTime, '?', [id]));
+      statements.push(...lockInsertStatements(existing.location, newDate, newTime, newAssignedTo, '?', [id]));
     }
 
     await db.batch(statements, 'write').catch(err => { throw toLockConflict(err); });
