@@ -217,16 +217,32 @@ router.get('/available-slots', async (req, res, next) => {
     });
     const locked = new Set(result.rows.map(r => r.slot_time));
 
-    const slots = [];
-    for (let mins = rules.startHour * 60; mins <= (rules.endHour - 1) * 60; mins += 30) {
-      const h = Math.floor(mins / 60).toString().padStart(2, '0');
-      const m = (mins % 60).toString().padStart(2, '0');
-      const time = `${h}:${m}`;
-      const neededLocks = slotsForBooking(time);
-      slots.push({ time, available: neededLocks.every(slot => !locked.has(slot)) });
+    let slots = [];
+    if (rules.standardSlots) {
+      for (const time of rules.standardSlots) {
+        const neededLocks = slotsForBooking(time);
+        slots.push({ time, available: neededLocks.every(slot => !locked.has(slot)) });
+      }
+    } else {
+      for (let mins = rules.startHour * 60; mins <= (rules.endHour - 1) * 60; mins += 30) {
+        const h = Math.floor(mins / 60).toString().padStart(2, '0');
+        const m = (mins % 60).toString().padStart(2, '0');
+        const time = `${h}:${m}`;
+        const neededLocks = slotsForBooking(time);
+        slots.push({ time, available: neededLocks.every(slot => !locked.has(slot)) });
+      }
     }
 
-    res.json({ available: true, slots });
+    let sessionInfo = null;
+    if (rules.maxSessionsPerNight && !req.user.isAdmin) {
+      const countResult = await db.execute({
+        sql: `SELECT COUNT(*) as count FROM bookings WHERE created_by = ? AND date = ? AND location = ? AND status != 'Cancelled'`,
+        args: [req.user.email, date, currentLocation],
+      });
+      sessionInfo = { used: Number(countResult.rows[0].count), max: rules.maxSessionsPerNight };
+    }
+
+    res.json({ available: true, slots, sessionInfo });
   } catch (err) { next(err); }
 });
 
@@ -273,6 +289,17 @@ router.post('/', async (req, res, next) => {
 
     const existingConflict = await checkDoubleBooking(location, date, time_booked);
     if (existingConflict.conflict) throw conflict(existingConflict.message);
+
+    const locationRules = LOCATION_RULES[location];
+    if (locationRules.maxSessionsPerNight && !req.user.isAdmin) {
+      const countResult = await db.execute({
+        sql: `SELECT COUNT(*) as count FROM bookings WHERE created_by = ? AND date = ? AND location = ? AND status != 'Cancelled'`,
+        args: [req.user.email, date, location],
+      });
+      if (Number(countResult.rows[0].count) >= locationRules.maxSessionsPerNight) {
+        return res.status(400).json({ error: `Maximum ${locationRules.maxSessionsPerNight} sessions per night reached` });
+      }
+    }
 
     const statements = [];
     if (!serviceUserId) {

@@ -45,6 +45,8 @@ export default function NewBooking({ editMode }) {
   })
   const [slots, setSlots] = useState([])
   const [slotsLoading, setSlotsLoading] = useState(false)
+  const [sessionInfo, setSessionInfo] = useState(null)
+  const [emergencyMode, setEmergencyMode] = useState(false)
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
   const [existingUser, setExistingUser] = useState(null)
@@ -80,16 +82,18 @@ export default function NewBooking({ editMode }) {
 
   // Load slots when date/location change
   useEffect(() => {
-    if (!form.date || !form.location) { setSlots([]); return }
-    if (!isDayValid(form.date, form.location)) { setSlots([]); return }
+    if (!form.date || !form.location) { setSlots([]); setSessionInfo(null); return }
+    if (!isDayValid(form.date, form.location)) { setSlots([]); setSessionInfo(null); return }
 
     setSlotsLoading(true)
+    setEmergencyMode(false)
     apiFetch(`/api/bookings/available-slots?date=${form.date}&location=${encodeURIComponent(form.location)}`)
       .then(r => r.json())
       .then(data => {
         setSlots(data.slots || [])
+        setSessionInfo(data.sessionInfo || null)
       })
-      .catch(() => setSlots([]))
+      .catch(() => { setSlots([]); setSessionInfo(null) })
       .finally(() => setSlotsLoading(false))
   }, [form.date, form.location])
 
@@ -120,6 +124,9 @@ export default function NewBooking({ editMode }) {
     if (!form.time_booked) return 'Time is required'
     if (!form.interaction_type) return 'Interaction type is required'
     if (!form.service_user_id && !form.full_name) return 'Name is required'
+    if (sessionInfo && sessionInfo.used >= sessionInfo.max) {
+      return `Session limit reached (${sessionInfo.used}/${sessionInfo.max} tonight). Contact an admin to add more.`
+    }
     return null
   }
 
@@ -207,14 +214,22 @@ export default function NewBooking({ editMode }) {
             {form.date && !dayInvalid ? (
               slotsLoading ? (
                 <div className="text-gray-500 text-sm py-3">Loading available slots...</div>
+              ) : emergencyMode ? (
+                <div>
+                  <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mb-2">
+                    Emergency booking — enter any time within operating hours.
+                  </p>
+                  <input type="time" className="input" value={form.time_booked}
+                    onChange={e => set('time_booked', e.target.value)} min="18:00" max="23:00" step="300" />
+                </div>
               ) : slots.length > 0 ? (
-                <div className="grid grid-cols-3 md:grid-cols-6 gap-2">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
                   {slots.map(s => (
                     <button
                       key={s.time}
                       disabled={!s.available}
                       onClick={() => set('time_booked', s.time)}
-                      className={`min-h-[48px] rounded-xl text-base font-semibold border-2 transition-all ${
+                      className={`min-h-[56px] rounded-xl text-base font-semibold border-2 transition-all ${
                         form.time_booked === s.time
                           ? 'bg-blue-600 border-blue-600 text-white'
                           : s.available
@@ -223,6 +238,7 @@ export default function NewBooking({ editMode }) {
                       }`}
                     >
                       {s.time}
+                      <div className="text-xs font-normal opacity-60">50 min</div>
                     </button>
                   ))}
                 </div>
@@ -233,6 +249,31 @@ export default function NewBooking({ editMode }) {
             ) : (
               <div className="input bg-gray-100 text-gray-400 cursor-not-allowed">
                 Select a valid date first
+              </div>
+            )}
+
+            {sessionInfo && (
+              <div className={`mt-2 text-sm rounded-lg px-3 py-2 font-medium ${
+                sessionInfo.used >= sessionInfo.max
+                  ? 'bg-red-50 border border-red-200 text-red-700'
+                  : sessionInfo.used >= sessionInfo.max - 1
+                    ? 'bg-amber-50 border border-amber-200 text-amber-700'
+                    : 'bg-gray-50 border border-gray-200 text-gray-600'
+              }`}>
+                {sessionInfo.used}/{sessionInfo.max} sessions booked tonight
+                {sessionInfo.used >= sessionInfo.max && ' — limit reached'}
+              </div>
+            )}
+
+            {form.location === 'Solace Café' && form.date && !dayInvalid && !slotsLoading && (
+              <div className="mt-3">
+                <button
+                  type="button"
+                  onClick={() => { setEmergencyMode(m => !m); set('time_booked', '') }}
+                  className="text-sm text-orange-600 underline hover:text-orange-700"
+                >
+                  {emergencyMode ? '← Back to standard slots' : 'Emergency / off-hour booking'}
+                </button>
               </div>
             )}
           </div>

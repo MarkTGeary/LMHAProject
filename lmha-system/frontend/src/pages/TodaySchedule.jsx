@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../App'
 import Layout from '../components/Layout'
@@ -32,13 +32,15 @@ function getColor(b) {
 }
 
 export default function WeeklySchedule() {
-  const { location } = useAuth()
+  const { location, user } = useAuth()
   const _rules = LOCATION_RULES[location] || LOCATION_RULES['LMHA']
   const hours = { start: _rules.startHour, end: _rules.endHour, days: _rules.days }
+  const breakPeriods = _rules.breakPeriods || []
   const [weekStart, setWeekStart] = useState(() => getMondayOf(new Date()))
   const [bookings, setBookings]   = useState([])
   const [loading, setLoading]     = useState(true)
   const [selected, setSelected]   = useState(null)
+  const [viewFilter, setViewFilter] = useState('mine')
 
   const visibleDays = Array.from({ length: 7 }, (_, i) => {
     const d = new Date(weekStart)
@@ -63,8 +65,19 @@ export default function WeeklySchedule() {
   const goToday  = () => { setWeekStart(getMondayOf(new Date())); setSelected(null) }
   const todayStr = fmt(new Date())
 
+  const workers = useMemo(
+    () => [...new Set(bookings.map(b => b.created_by).filter(Boolean))].sort(),
+    [bookings]
+  )
+
+  const displayBookings = useMemo(() => {
+    if (viewFilter === 'all') return bookings
+    const email = viewFilter === 'mine' ? user?.email : viewFilter
+    return bookings.filter(b => b.created_by === email)
+  }, [bookings, viewFilter, user])
+
   const byDate = {}
-  bookings.forEach(b => {
+  displayBookings.forEach(b => {
     if (!byDate[b.date]) byDate[b.date] = []
     byDate[b.date].push(b)
   })
@@ -104,6 +117,31 @@ export default function WeeklySchedule() {
           <div className="flex-1 text-center font-bold">{weekLabel}</div>
           <button onClick={nextWeek} className="btn-secondary btn-sm px-4">Next</button>
           <button onClick={goToday} className="btn-primary btn-sm">Today</button>
+        </div>
+
+        <div className="card p-3 flex flex-wrap items-center gap-2">
+          <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide shrink-0">Schedule:</span>
+          <button
+            onClick={() => setViewFilter('mine')}
+            className={'btn-sm ' + (viewFilter === 'mine' ? 'btn-primary' : 'btn-secondary')}
+          >
+            Mine
+          </button>
+          <button
+            onClick={() => setViewFilter('all')}
+            className={'btn-sm ' + (viewFilter === 'all' ? 'btn-primary' : 'btn-secondary')}
+          >
+            All
+          </button>
+          {workers.filter(w => w !== user?.email).map(w => (
+            <button
+              key={w}
+              onClick={() => setViewFilter(w)}
+              className={'btn-sm ' + (viewFilter === w ? 'btn-primary' : 'btn-secondary')}
+            >
+              {w.split('@')[0]}
+            </button>
+          ))}
         </div>
 
         <div className="flex flex-wrap gap-3 text-sm px-1">
@@ -162,6 +200,19 @@ export default function WeeklySchedule() {
                         {hourLabels.map((_, i) => (
                           <div key={i} className="absolute w-full border-t border-gray-100" style={{ top: i * ROW_PX }} />
                         ))}
+
+                        {breakPeriods.map((bp, i) => {
+                          const topPx = ((timeToMins(bp.start) - startMins) / 60) * ROW_PX
+                          const heightPx = ((timeToMins(bp.end) - timeToMins(bp.start)) / 60) * ROW_PX
+                          return (
+                            <div key={i}
+                              className="absolute inset-x-0 bg-gray-200/70 border-y border-dashed border-gray-300 z-10 pointer-events-none flex items-center justify-center"
+                              style={{ top: topPx, height: heightPx }}
+                            >
+                              <span className="text-xs text-gray-400 font-medium">break</span>
+                            </div>
+                          )
+                        })}
 
                         {isToday && nowPct !== null && (
                           <div className="absolute w-full z-20 pointer-events-none" style={{ top: nowPct + '%' }}>
@@ -241,9 +292,9 @@ export default function WeeklySchedule() {
           </div>
         )}
 
-        {!loading && bookings.length > 0 && (
+        {!loading && displayBookings.length > 0 && (
           <div className="space-y-3">
-            <h3 className="font-bold text-gray-700 text-lg">Week summary ({bookings.length} bookings)</h3>
+            <h3 className="font-bold text-gray-700 text-lg">Week summary ({displayBookings.length} bookings)</h3>
             {visibleDays.map(d => {
               const ds = fmt(d)
               const dayBookings = byDate[ds] || []
@@ -275,9 +326,11 @@ export default function WeeklySchedule() {
           </div>
         )}
 
-        {!loading && bookings.length === 0 && (
+        {!loading && displayBookings.length === 0 && (
           <div className="card text-center py-10">
-            <div className="text-gray-500 text-lg">No bookings this week</div>
+            <div className="text-gray-500 text-lg">
+              {viewFilter === 'mine' ? 'No bookings in your schedule this week' : 'No bookings this week'}
+            </div>
             <Link to="/bookings/new" className="btn-primary mt-4 inline-flex">New Booking</Link>
           </div>
         )}
