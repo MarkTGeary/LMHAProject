@@ -42,7 +42,7 @@ export default function NewBooking({ editMode }) {
     full_name: '',
     phone: '',
     service_user_id: null,
-    assigned_to: user?.email || null,
+    assigned_to: null,
   })
   const [slots, setSlots] = useState([])
   const [slotsLoading, setSlotsLoading] = useState(false)
