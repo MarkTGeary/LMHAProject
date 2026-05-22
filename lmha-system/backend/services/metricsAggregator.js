@@ -100,7 +100,7 @@ async function aggregateMetrics(location, startDate, endDate) {
     crisis_support:          bookings.filter(b => hasSupport(b, 'C')).length,
     other_supports: bookings.filter(b =>
       hasSupport(b, 'O') ||
-      ['Phone Call', 'Email', 'Text', 'Off-the-cuff'].includes(b.interaction_type)
+      ['Phone Call', 'Email', 'Text'].includes(b.interaction_type)
     ).length,
   };
   s2.total = s2.information_seeking + s2.social_support_signposting +

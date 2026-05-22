@@ -23,8 +23,6 @@ const INTERACTION_TYPES = [
   'Peer Support Booking',
   'Email',
   'Text',
-  'Scheduled',
-  'Off-the-cuff',
 ];
 const NEW_REPEAT = ['New', 'Repeat'];
 const SUPPORT_TYPES = ['SS', 'PS', 'C', 'O', 'SP'];

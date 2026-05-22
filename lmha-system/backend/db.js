@@ -51,7 +51,7 @@ async function initAndMigrate() {
       time_in TEXT,
       time_out TEXT,
       interaction_type TEXT NOT NULL CHECK(interaction_type IN (
-        'Phone Call','Walk-In','Crisis','Peer Support Booking','Email','Text','Scheduled','Off-the-cuff'
+        'Phone Call','Walk-In','Crisis','Peer Support Booking','Email','Text'
       )),
       new_or_repeat TEXT CHECK(new_or_repeat IN ('New','Repeat')),
       referred_from TEXT,

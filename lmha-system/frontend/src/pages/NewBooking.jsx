@@ -12,8 +12,6 @@ const INTERACTION_TYPES = [
   { value: 'Crisis', icon: '🚨', color: 'bg-red-100 border-red-400 text-red-800' },
   { value: 'Email', icon: '✉️', color: 'bg-yellow-100 border-yellow-400 text-yellow-800' },
   { value: 'Text', icon: '💬', color: 'bg-indigo-100 border-indigo-400 text-indigo-800' },
-  { value: 'Scheduled', icon: '📅', color: 'bg-teal-100 border-teal-400 text-teal-800' },
-  { value: 'Off-the-cuff', icon: '⚡', color: 'bg-orange-100 border-orange-400 text-orange-800' },
 ]
 
 const REFERRED_FROM = ['Self-referral', 'NGO', 'HSE', 'GP', 'Other']

@@ -14,8 +14,7 @@ const INTERACTION_ICONS = {
   'Peer Support Booking': '🤝',
   'Email': '✉️',
   'Text': '💬',
-  'Scheduled': '📅',
-  'Off-the-cuff': '💬',
+
 }
 
 export default function BookingCard({ booking, onRefresh }) {
