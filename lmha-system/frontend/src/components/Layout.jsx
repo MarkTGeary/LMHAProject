@@ -85,6 +85,7 @@ export default function Layout({ children, title, back }) {
             { to: '/bookings/new', icon: '➕', label: 'New Booking' },
             { to: '/cases', icon: '📋', label: 'Cases' },
             { to: '/schedule', icon: '📅', label: 'Schedule' },
+            { to: '/limitations', icon: '⚠️', label: 'Limits' },
             { to: '/metrics', icon: '📊', label: 'Metrics' },
             ...(user?.isAdmin ? [{ to: '/settings', icon: '⚙️', label: 'Settings' }] : []),
           ].map(({ to, icon, label }) => (

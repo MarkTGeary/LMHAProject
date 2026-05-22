@@ -5,19 +5,26 @@ const db = require('../db');
  * Returns an object matching the Google Sheets sections.
  */
 async function aggregateMetrics(location, startDate, endDate) {
-  const bookingsResult = await db.execute({
-    sql: `SELECT b.*,
-                 i.referral_source, i.reasons_for_attending,
-                 i.support_needs, i.onward_referrals,
-                 i.limitations_detail as intake_limitations_detail
-          FROM bookings b
-          LEFT JOIN intake_forms i ON i.booking_id = b.id
-          WHERE b.location = ?
-            AND b.date BETWEEN ? AND ?
-            AND b.status != 'Cancelled'`,
-    args: [location, startDate, endDate],
-  });
+  const [bookingsResult, standaloneResult] = await Promise.all([
+    db.execute({
+      sql: `SELECT b.*,
+                   i.referral_source, i.reasons_for_attending,
+                   i.support_needs, i.onward_referrals,
+                   i.limitations_detail as intake_limitations_detail
+            FROM bookings b
+            LEFT JOIN intake_forms i ON i.booking_id = b.id
+            WHERE b.location = ?
+              AND b.date BETWEEN ? AND ?
+              AND b.status != 'Cancelled'`,
+      args: [location, startDate, endDate],
+    }),
+    db.execute({
+      sql: `SELECT * FROM standalone_limitations WHERE location = ? AND date BETWEEN ? AND ?`,
+      args: [location, startDate, endDate],
+    }),
+  ]);
   const bookings = bookingsResult.rows;
+  const standaloneLimitations = standaloneResult.rows;
 
   const attended    = bookings.filter(b => b.outcome === 'Attended');
   const dna         = bookings.filter(b => b.outcome === 'Did Not Attend');
@@ -54,11 +61,15 @@ async function aggregateMetrics(location, startDate, endDate) {
   }
 
   function countLimitation(key) {
-    return bookings.filter(b => {
+    const fromBookings = bookings.filter(b => {
       const fromBooking = parseJson(b.limitations_detail);
       const fromIntake = parseJson(b.intake_limitations_detail);
       return fromBooking.includes(key) || fromIntake.includes(key);
     }).length;
+    const fromStandalone = standaloneLimitations.filter(r =>
+      parseJson(r.limitations_detail).includes(key)
+    ).length;
+    return fromBookings + fromStandalone;
   }
 
   // --- Section 1: General Service Information ---
@@ -191,7 +202,7 @@ async function aggregateMetrics(location, startDate, endDate) {
                       limitations.lim_calls_out_hours + limitations.lim_text_out_hours;
   limitations.lim_indv_not_facilitated = bookings.filter(b =>
     parseJson(b.limitations_detail).length > 0
-  ).length;
+  ).length + standaloneLimitations.length;
 
   return {
     section1: s1,

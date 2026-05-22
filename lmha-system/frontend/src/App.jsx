@@ -10,6 +10,7 @@ import TodaySchedule from './pages/TodaySchedule'
 import IntakeForm from './pages/IntakeForm'
 import OutcomeForm from './pages/OutcomeForm'
 import MetricsDashboard from './pages/MetricsDashboard'
+import Limitations from './pages/Limitations'
 import Settings from './pages/Settings'
 
 export const AuthContext = createContext(null)
@@ -209,6 +210,9 @@ export default function App() {
           } />
           <Route path="/metrics" element={
             <RequireLocation><MetricsDashboard /></RequireLocation>
+          } />
+          <Route path="/limitations" element={
+            <RequireLocation><Limitations /></RequireLocation>
           } />
           <Route path="/settings" element={
             <RequireAdmin><Settings /></RequireAdmin>

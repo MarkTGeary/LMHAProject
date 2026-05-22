@@ -87,6 +87,7 @@ app.use('/api/bookings',      requireLocation, require('./routes/bookings'));
 app.use('/api/service-users', requireLocation, require('./routes/serviceUsers'));
 app.use('/api/intake-forms',  requireLocation, require('./routes/intakeForms'));
 app.use('/api/metrics',       requireLocation, require('./routes/metrics'));
+app.use('/api/limitations',   requireLocation, require('./routes/limitations'));
 
 // Health check
 app.get('/api/health', (req, res) => res.json({

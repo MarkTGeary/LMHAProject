@@ -214,6 +214,27 @@ async function initAndMigrate() {
 
   await auditAndBackfillBookingLocks();
 
+  // ── Migration: standalone_limitations ────────────────────────────
+  if (!tables.includes('standalone_limitations')) {
+    console.log('[DB] Running migration: creating standalone_limitations...');
+    await _client.executeMultiple(`
+      CREATE TABLE standalone_limitations (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        location TEXT NOT NULL CHECK(location IN ('LMHA','Solace Café')),
+        date TEXT NOT NULL,
+        limitations_detail TEXT NOT NULL DEFAULT '[]',
+        notes TEXT,
+        created_at TEXT DEFAULT (datetime('now'))
+      )
+    `);
+    console.log('[DB] Migration complete: standalone_limitations created.');
+  }
+
+  await _client.execute(`
+    CREATE INDEX IF NOT EXISTS idx_standalone_limitations_location_date
+      ON standalone_limitations(location, date)
+  `);
+
   console.log('[DB] Init and migrations complete.');
 }
 
