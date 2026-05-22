@@ -46,6 +46,7 @@ export default function NewBooking({ editMode }) {
   const [slotsLoading, setSlotsLoading] = useState(false)
   const [sessionInfo, setSessionInfo] = useState(null)
   const [emergencyMode, setEmergencyMode] = useState(false)
+  const [flexibleTiming, setFlexibleTiming] = useState(false)
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
   const [existingUser, setExistingUser] = useState(null)
@@ -96,6 +97,7 @@ export default function NewBooking({ editMode }) {
 
     setSlotsLoading(true)
     setEmergencyMode(false)
+    setFlexibleTiming(false)
     const assigneeParam = form.assigned_to ? '&assigned_to=' + encodeURIComponent(form.assigned_to) : ''
     apiFetch(`/api/bookings/available-slots?date=${form.date}&location=${encodeURIComponent(form.location)}${assigneeParam}`)
       .then(r => r.json())
@@ -232,6 +234,14 @@ export default function NewBooking({ editMode }) {
                   <input type="time" className="input" value={form.time_booked}
                     onChange={e => set('time_booked', e.target.value)} min="18:00" max="23:00" step="300" />
                 </div>
+              ) : flexibleTiming ? (
+                <div>
+                  <p className="text-xs text-blue-700 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 mb-2">
+                    Flexible timing — enter the actual time of arrival.
+                  </p>
+                  <input type="time" className="input" value={form.time_booked}
+                    onChange={e => set('time_booked', e.target.value)} step="60" />
+                </div>
               ) : slots.length > 0 ? (
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
                   {slots.map(s => (
@@ -275,7 +285,19 @@ export default function NewBooking({ editMode }) {
               </div>
             )}
 
-            {form.location === 'Solace Café' && form.date && !dayInvalid && !slotsLoading && (
+            {['Walk-In', 'Crisis'].includes(form.interaction_type) && form.date && !dayInvalid && !slotsLoading && !emergencyMode && (
+              <div className="mt-3">
+                <button
+                  type="button"
+                  onClick={() => { setFlexibleTiming(m => !m); set('time_booked', '') }}
+                  className="text-sm text-blue-600 underline hover:text-blue-700"
+                >
+                  {flexibleTiming ? '← Back to standard slots' : 'Flexible timing — walk-in arrived off-schedule'}
+                </button>
+              </div>
+            )}
+
+            {form.location === 'Solace Café' && form.date && !dayInvalid && !slotsLoading && !flexibleTiming && (
               <div className="mt-3">
                 <button
                   type="button"

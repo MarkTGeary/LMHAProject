@@ -267,8 +267,10 @@ router.post('/', async (req, res, next) => {
   try {
     const location = assertRequestLocation(req, req.body.location);
     const date = parseDateString(req.body.date, 'date');
-    const time_booked = parseTimeString(req.body.time_booked, 'time_booked');
     const interaction_type = enumValue(req.body.interaction_type, INTERACTION_TYPES, 'interaction_type');
+    const flexibleTimingTypes = ['Walk-In', 'Crisis'];
+    const time_booked = parseTimeString(req.body.time_booked, 'time_booked',
+      { stepMinutes: flexibleTimingTypes.includes(interaction_type) ? 1 : 30 });
     const serviceUserId = parseId(req.body.service_user_id, 'service_user_id', { required: false });
     const fullName = normaliseString(req.body.full_name, 'full_name', { required: !serviceUserId, max: 200 });
     const phone = normaliseString(req.body.phone, 'phone', { max: 100 });
@@ -364,8 +366,13 @@ router.patch('/:id', async (req, res, next) => {
 
     const values = {};
     if (hasOwn(req.body, 'date')) values.date = parseDateString(req.body.date, 'date');
-    if (hasOwn(req.body, 'time_booked')) values.time_booked = parseTimeString(req.body.time_booked, 'time_booked');
     if (hasOwn(req.body, 'interaction_type')) values.interaction_type = enumValue(req.body.interaction_type, INTERACTION_TYPES, 'interaction_type');
+    if (hasOwn(req.body, 'time_booked')) {
+      const resolvedType = values.interaction_type ?? existing.interaction_type;
+      const flexibleTimingTypes = ['Walk-In', 'Crisis'];
+      values.time_booked = parseTimeString(req.body.time_booked, 'time_booked',
+        { stepMinutes: flexibleTimingTypes.includes(resolvedType) ? 1 : 30 });
+    }
     if (hasOwn(req.body, 'new_or_repeat')) values.new_or_repeat = enumValue(req.body.new_or_repeat, NEW_REPEAT, 'new_or_repeat', { required: false });
     if (hasOwn(req.body, 'referred_from')) values.referred_from = normaliseString(req.body.referred_from, 'referred_from', { max: 200 });
     if (hasOwn(req.body, 'type_of_support')) values.type_of_support = normalizeSupport(req.body.type_of_support);
