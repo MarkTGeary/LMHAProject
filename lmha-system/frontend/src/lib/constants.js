@@ -1,5 +1,5 @@
 export const LOCATION_RULES = {
-  'LMHA':        { days: [1, 2, 3, 4, 5], label: 'Mon–Fri', startHour: 11, endHour: 17 },
+  'LMHA':        { days: [1, 2, 3, 4, 5], label: 'Mon–Fri', startHour: 11, endHour: 17, standardSlots: ['11:00', '12:00', '13:30', '14:30'] },
   'Solace Café': {
     days: [4, 5, 6, 0], label: 'Thu–Sun', startHour: 18, endHour: 24,
     standardSlots: ['18:00', '19:00', '21:00', '23:00'],

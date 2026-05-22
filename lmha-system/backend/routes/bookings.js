@@ -60,26 +60,6 @@ function validateBookingTime(location, dateStr, timeStr, allowPast = false) {
   const rules = LOCATION_RULES[location];
   if (!rules) return { valid: false, error: 'Unknown location' };
 
-  const date = new Date(dateStr + 'T12:00:00');
-  if (!allowPast && date < localTodayStart()) {
-    return { valid: false, error: 'Booking date cannot be in the past' };
-  }
-
-  if (!rules.days.includes(date.getDay())) {
-    return { valid: false, error: `${location} is not open on this day` };
-  }
-
-  const totalMins = timeToMinutes(timeStr);
-  const openMins = rules.startHour * 60;
-  const latestStartMins = (rules.endHour - 1) * 60;
-  if (totalMins < openMins || totalMins > latestStartMins) {
-    const endDisplay = rules.endHour === 24 ? '23:00' : `${rules.endHour - 1}:00`;
-    return {
-      valid: false,
-      error: `${location} hours: ${rules.startHour}:00-${endDisplay} (last booking start)`,
-    };
-  }
-
   return { valid: true };
 }
 
@@ -145,7 +125,8 @@ router.get('/', async (req, res, next) => {
       SELECT b.*,
              su.full_name,
              su.phone,
-             CASE WHEN i.id IS NOT NULL THEN 1 ELSE 0 END as intake_complete
+             CASE WHEN i.id IS NOT NULL THEN 1 ELSE 0 END as intake_complete,
+             (SELECT COUNT(*) FROM bookings b2 WHERE b2.service_user_id = b.service_user_id AND b2.status != 'Cancelled') as visit_count
       FROM bookings b
       LEFT JOIN service_users su ON b.service_user_id = su.id
       LEFT JOIN intake_forms i ON i.booking_id = b.id
@@ -299,14 +280,20 @@ router.post('/', async (req, res, next) => {
     const carer_attended = booleanInt(req.body.carer_attended ?? false, 'carer_attended');
     const peer_support_worker = normaliseString(req.body.peer_support_worker, 'peer_support_worker', { max: 200 });
     const limitations = normaliseString(req.body.limitations, 'limitations', { max: 5000 });
+    const limitations_detail = hasOwn(req.body, 'limitations_detail')
+      ? JSON.stringify(Array.isArray(req.body.limitations_detail) ? req.body.limitations_detail.filter(k => typeof k === 'string') : [])
+      : null;
     const notes = normaliseString(req.body.notes, 'notes', { max: 5000 });
     const assigned_to = req.body.assigned_to ? normaliseString(req.body.assigned_to, 'assigned_to', { max: 200 }) : null;
 
     const timeValid = validateBookingTime(location, date, time_booked);
     if (!timeValid.valid) return res.status(400).json({ error: timeValid.error });
 
-    const existingConflict = await checkDoubleBooking(location, date, time_booked, assigned_to);
-    if (existingConflict.conflict) throw conflict(existingConflict.message);
+    const skipDoubleBookingTypes = ['Crisis', 'Walk-In'];
+    if (!skipDoubleBookingTypes.includes(interaction_type)) {
+      const existingConflict = await checkDoubleBooking(location, date, time_booked, assigned_to);
+      if (existingConflict.conflict) throw conflict(existingConflict.message);
+    }
 
     const locationRules = LOCATION_RULES[location];
     if (locationRules.maxSessionsPerNight && !req.user.isAdmin) {
@@ -331,7 +318,7 @@ router.post('/', async (req, res, next) => {
     const bookingArgs = [
       location, date, time_booked, interaction_type,
       new_or_repeat, referred_from, type_of_support, carer_attended,
-      peer_support_worker, limitations, notes, req.user.email, assigned_to,
+      peer_support_worker, limitations, limitations_detail, notes, req.user.email, assigned_to,
     ];
     const serviceUserSql = serviceUserId ? '?' : 'last_insert_rowid()';
     if (serviceUserId) bookingArgs.unshift(serviceUserId);
@@ -341,8 +328,8 @@ router.post('/', async (req, res, next) => {
       sql: `INSERT INTO bookings (
               service_user_id, location, date, time_booked, interaction_type,
               new_or_repeat, referred_from, type_of_support, carer_attended,
-              peer_support_worker, limitations, notes, outcome, status, created_by, assigned_to
-            ) VALUES (${serviceUserSql}, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Pending', 'Active', ?, ?)`,
+              peer_support_worker, limitations, limitations_detail, notes, outcome, status, created_by, assigned_to
+            ) VALUES (${serviceUserSql}, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Pending', 'Active', ?, ?)`,
       args: bookingArgs,
     });
     statements.push(...lockInsertStatements(location, date, time_booked, assigned_to));
@@ -387,6 +374,11 @@ router.patch('/:id', async (req, res, next) => {
     if (hasOwn(req.body, 'carer_attended')) values.carer_attended = booleanInt(req.body.carer_attended, 'carer_attended');
     if (hasOwn(req.body, 'peer_support_worker')) values.peer_support_worker = normaliseString(req.body.peer_support_worker, 'peer_support_worker', { max: 200 });
     if (hasOwn(req.body, 'limitations')) values.limitations = normaliseString(req.body.limitations, 'limitations', { max: 5000 });
+    if (hasOwn(req.body, 'limitations_detail')) {
+      values.limitations_detail = JSON.stringify(
+        Array.isArray(req.body.limitations_detail) ? req.body.limitations_detail.filter(k => typeof k === 'string') : []
+      );
+    }
     if (hasOwn(req.body, 'notes')) values.notes = normaliseString(req.body.notes, 'notes', { max: 5000 });
     if (hasOwn(req.body, 'time_in')) values.time_in = req.body.time_in ? parseTimeString(req.body.time_in, 'time_in', { stepMinutes: 1 }) : null;
     if (hasOwn(req.body, 'time_out')) values.time_out = req.body.time_out ? parseTimeString(req.body.time_out, 'time_out', { stepMinutes: 1 }) : null;
@@ -400,32 +392,41 @@ router.patch('/:id', async (req, res, next) => {
     const newTime = values.time_booked ?? existing.time_booked;
     const newStatus = values.status ?? existing.status;
     const newAssignedTo = hasOwn(values, 'assigned_to') ? values.assigned_to : existing.assigned_to;
+    const currentInteractionType = hasOwn(values, 'interaction_type') ? values.interaction_type : existing.interaction_type;
+    const skipDoubleBookingTypes = ['Crisis', 'Walk-In'];
     if (hasOwn(values, 'date') || hasOwn(values, 'time_booked') || hasOwn(values, 'assigned_to')) {
       const timeValid = validateBookingTime(existing.location, newDate, newTime, true);
       if (!timeValid.valid) return res.status(400).json({ error: timeValid.error });
-      const existingConflict = await checkDoubleBooking(existing.location, newDate, newTime, newAssignedTo, id);
-      if (existingConflict.conflict) throw conflict(existingConflict.message);
+      if (!skipDoubleBookingTypes.includes(currentInteractionType)) {
+        const existingConflict = await checkDoubleBooking(existing.location, newDate, newTime, newAssignedTo, id);
+        if (existingConflict.conflict) throw conflict(existingConflict.message);
+      }
     }
 
     if (newStatus === 'Closed') {
-      const intakeResult = await db.execute({
-        sql: 'SELECT id FROM intake_forms WHERE booking_id = ?',
-        args: [id],
-      });
-      if (!intakeResult.rows.length) throw conflict('Cannot close: intake form not completed');
-
       const targetOutcome = values.outcome ?? existing.outcome;
       if (!targetOutcome || targetOutcome === 'Pending') {
         throw conflict('Cannot close: outcome must be set (Attended or Did Not Attend)');
       }
-      const targetSupport = hasOwn(values, 'type_of_support') ? values.type_of_support : existing.type_of_support;
-      if (!targetSupport || !JSON.parse(targetSupport).length) {
-        throw conflict('Cannot close: type of support must be selected');
+    }
+
+    // Update service user name/phone when edited on a booking
+    if (existing.service_user_id) {
+      if (hasOwn(req.body, 'full_name')) {
+        const newName = normaliseString(req.body.full_name, 'full_name', { required: true, max: 200 });
+        await db.execute({ sql: 'UPDATE service_users SET full_name = ? WHERE id = ?', args: [newName, existing.service_user_id] });
+      }
+      if (hasOwn(req.body, 'phone')) {
+        const newPhone = normaliseString(req.body.phone, 'phone', { max: 100 });
+        await db.execute({ sql: 'UPDATE service_users SET phone = ? WHERE id = ?', args: [newPhone || null, existing.service_user_id] });
       }
     }
 
     const fieldNames = Object.keys(values);
-    if (!fieldNames.length) return res.status(400).json({ error: 'No fields to update' });
+    if (!fieldNames.length) {
+      const updated = await db.execute({ sql: 'SELECT * FROM bookings WHERE id = ?', args: [id] });
+      return res.json(updated.rows[0]);
+    }
 
     const sets = fieldNames.map(field => `${field} = ?`);
     const args = fieldNames.map(field => values[field]);

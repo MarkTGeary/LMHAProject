@@ -388,10 +388,32 @@ export default function IntakeForm() {
             <div className="field">
               <label className="label">Search existing records</label>
               <RepeatUserSearch
-                onSelect={(u) => {
+                onSelect={async (u) => {
                   setExistingUser(u)
                   setIsRepeat(true)
                   setSu(prev => ({ ...prev, full_name: u.full_name, phone: u.phone || '' }))
+                  try {
+                    const r = await apiFetch(`/api/service-users/${u.id}`)
+                    const data = await r.json()
+                    setSu(prev => ({
+                      ...prev,
+                      full_name: data.full_name || prev.full_name,
+                      phone: data.phone || prev.phone,
+                      email: data.email || prev.email,
+                      age_group: data.age_group || prev.age_group,
+                      gender: data.gender || prev.gender,
+                      living_alone: data.living_alone || prev.living_alone,
+                      english_speaking: data.english_speaking || prev.english_speaking,
+                      translator_required: data.translator_required || prev.translator_required,
+                      translator_language: data.translator_language || prev.translator_language,
+                      address: data.address || prev.address,
+                      emergency_contact_name: data.emergency_contact_name || prev.emergency_contact_name,
+                      emergency_contact_relationship: data.emergency_contact_relationship || prev.emergency_contact_relationship,
+                      emergency_contact_phone: data.emergency_contact_phone || prev.emergency_contact_phone,
+                      gp_name: data.gp_name || prev.gp_name,
+                      gp_phone: data.gp_phone || prev.gp_phone,
+                    }))
+                  } catch {}
                 }}
                 onClear={() => { setExistingUser(null); setIsRepeat(false) }}
               />
@@ -472,7 +494,20 @@ export default function IntakeForm() {
               </div>
 
               <div className="card">
-                <h2 className="text-xl font-bold mb-4">Emergency Contact</h2>
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-xl font-bold">Emergency Contact</h2>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSuField('emergency_contact_name', 'N/A')
+                      setSuField('emergency_contact_relationship', 'N/A')
+                      setSuField('emergency_contact_phone', 'N/A')
+                    }}
+                    className="btn-secondary btn-sm"
+                  >
+                    Skip (N/A)
+                  </button>
+                </div>
                 <div className="field">
                   <label className="label">Contact Name</label>
                   <input className="input" value={su.emergency_contact_name}
@@ -487,12 +522,22 @@ export default function IntakeForm() {
                 <div className="field">
                   <label className="label">Contact Phone</label>
                   <input className="input" type="tel" value={su.emergency_contact_phone}
-                    onChange={e => setSuField('emergency_contact_phone', e.target.value)} />
+                    onChange={e => setSuField('emergency_contact_phone', e.target.value)}
+                    placeholder="Phone number or N/A" />
                 </div>
               </div>
 
               <div className="card">
-                <h2 className="text-xl font-bold mb-4">GP Details</h2>
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-xl font-bold">GP Details</h2>
+                  <button
+                    type="button"
+                    onClick={() => { setSuField('gp_name', 'N/A'); setSuField('gp_phone', 'N/A') }}
+                    className="btn-secondary btn-sm"
+                  >
+                    Skip (N/A)
+                  </button>
+                </div>
                 <div className="field">
                   <label className="label">GP Name</label>
                   <input className="input" value={su.gp_name} onChange={e => setSuField('gp_name', e.target.value)} />
@@ -607,18 +652,6 @@ export default function IntakeForm() {
                 />
               </div>
             ))}
-          </div>
-
-          {/* ── Optional: Limitations ── */}
-          <div className="card border-2 border-gray-200">
-            <h2 className="text-lg font-bold mb-1 text-gray-700">Limitations <span className="text-sm font-normal text-gray-400">(Optional)</span></h2>
-            <p className="text-sm text-gray-500 mb-4">Did this person previously try to contact the service at a time we couldn't facilitate them?</p>
-            <KeyCheckGroup
-              label="Previous out-of-hours contact attempts"
-              options={booking?.location === 'LMHA' ? LIMITATIONS_LMHA : LIMITATIONS_SOLACE}
-              values={p2.limitations_detail}
-              onChange={vals => setP2Field('limitations_detail', vals)}
-            />
           </div>
 
           {/* Acknowledgements — CRITICAL */}

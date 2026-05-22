@@ -67,6 +67,11 @@ export default function BookingCard({ booking, onRefresh }) {
             {booking.new_or_repeat}
           </span>
         )}
+        {booking.service_user_id && booking.visit_count > 1 && (
+          <span className="text-sm bg-purple-100 text-purple-700 rounded-lg px-3 py-1 font-medium">
+            #{booking.visit_count} visits
+          </span>
+        )}
       </div>
 
       {/* Status badges */}

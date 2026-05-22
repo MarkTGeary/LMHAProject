@@ -179,13 +179,18 @@ async function initAndMigrate() {
 
   await migrateAllowedEmailRoles();
 
-  // ── Migration: bookings.assigned_to ──────────────────────────────
+  // ── Migration: bookings columns ───────────────────────────────────
   const bookingColsResult = await _client.execute('PRAGMA table_info(bookings)');
   const bookingCols = bookingColsResult.rows.map(r => r.name);
   if (!bookingCols.includes('assigned_to')) {
     console.log('[DB] Running migration: adding bookings.assigned_to...');
     await _client.execute('ALTER TABLE bookings ADD COLUMN assigned_to TEXT');
     console.log('[DB] Migration complete: bookings.assigned_to added.');
+  }
+  if (!bookingCols.includes('limitations_detail')) {
+    console.log('[DB] Running migration: adding bookings.limitations_detail...');
+    await _client.execute('ALTER TABLE bookings ADD COLUMN limitations_detail TEXT');
+    console.log('[DB] Migration complete: bookings.limitations_detail added.');
   }
 
   // ── Migration: booking_slot_locks → per-worker PK ────────────────

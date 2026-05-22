@@ -10,9 +10,10 @@ const INTERACTION_TYPES = [
   { value: 'Phone Call', icon: '📞', color: 'bg-green-100 border-green-400 text-green-800' },
   { value: 'Walk-In', icon: '🚶', color: 'bg-blue-100 border-blue-400 text-blue-800' },
   { value: 'Crisis', icon: '🚨', color: 'bg-red-100 border-red-400 text-red-800' },
-  { value: 'Peer Support Booking', icon: '🤝', color: 'bg-purple-100 border-purple-400 text-purple-800' },
   { value: 'Email', icon: '✉️', color: 'bg-yellow-100 border-yellow-400 text-yellow-800' },
   { value: 'Text', icon: '💬', color: 'bg-indigo-100 border-indigo-400 text-indigo-800' },
+  { value: 'Scheduled', icon: '📅', color: 'bg-teal-100 border-teal-400 text-teal-800' },
+  { value: 'Off-the-cuff', icon: '⚡', color: 'bg-orange-100 border-orange-400 text-orange-800' },
 ]
 
 const REFERRED_FROM = ['Self-referral', 'NGO', 'HSE', 'GP', 'Other']
@@ -36,7 +37,6 @@ export default function NewBooking({ editMode }) {
     interaction_type: '',
     new_or_repeat: 'New',
     referred_from: '',
-    peer_support_worker: '',
     carer_attended: false,
     notes: '',
     full_name: '',
@@ -81,7 +81,6 @@ export default function NewBooking({ editMode }) {
             interaction_type: b.interaction_type,
             new_or_repeat: b.new_or_repeat || 'New',
             referred_from: b.referred_from || '',
-            peer_support_worker: b.peer_support_worker || '',
             carer_attended: !!b.carer_attended,
             notes: b.notes || '',
             full_name: b.full_name || '',
@@ -96,7 +95,6 @@ export default function NewBooking({ editMode }) {
   // Load slots when date/location change
   useEffect(() => {
     if (!form.date || !form.location) { setSlots([]); setSessionInfo(null); return }
-    if (!isDayValid(form.date, form.location)) { setSlots([]); setSessionInfo(null); return }
 
     setSlotsLoading(true)
     setEmergencyMode(false)
@@ -132,9 +130,6 @@ export default function NewBooking({ editMode }) {
   const validate = () => {
     if (!form.location) return 'Location is required'
     if (!form.date) return 'Date is required'
-    if (!isDayValid(form.date, form.location)) {
-      return `${form.location} is not open on this day (${LOCATION_RULES[form.location]?.label})`
-    }
     if (!form.time_booked) return 'Time is required'
     if (!form.interaction_type) return 'Interaction type is required'
     if (!form.service_user_id && !form.full_name) return 'Name is required'
@@ -191,7 +186,7 @@ export default function NewBooking({ editMode }) {
             <RepeatUserSearch onSelect={handleUserSelect} onClear={handleUserClear} />
           </div>
 
-          {!existingUser && (
+          {(!existingUser || editMode) && (
             <>
               <div className="field">
                 <label className="label">Full Name <span className="text-red-500">*</span></label>
@@ -215,13 +210,13 @@ export default function NewBooking({ editMode }) {
             <label className="label">Date <span className="text-red-500">*</span></label>
             <input
               type="date"
-              className={`input ${dayInvalid ? 'border-red-400 bg-red-50' : ''}`}
+              className="input"
               value={form.date}
               onChange={e => { set('date', e.target.value); set('time_booked', '') }}
             />
             {dayInvalid && (
-              <p className="text-red-600 text-sm mt-1 font-semibold">
-                {form.location} is closed on this day ({LOCATION_RULES[form.location]?.label})
+              <p className="text-amber-600 text-sm mt-1">
+                Note: {form.location} normally operates {LOCATION_RULES[form.location]?.label} — booking will still be saved.
               </p>
             )}
           </div>
@@ -384,12 +379,6 @@ export default function NewBooking({ editMode }) {
               <option value="">— Select if known —</option>
               {REFERRED_FROM.map(v => <option key={v} value={v}>{v}</option>)}
             </select>
-          </div>
-
-          <div className="field">
-            <label className="label">Peer Support Worker</label>
-            <input className="input" value={form.peer_support_worker} onChange={e => set('peer_support_worker', e.target.value)}
-              placeholder="Name of PS worker assigned" />
           </div>
 
           <div className="field">
