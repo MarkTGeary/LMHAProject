@@ -8,14 +8,14 @@ function minutesToTime(totalMinutes) {
 }
 
 function timeToMinutes(time) {
-  parseTimeString(time, 'time');
+  parseTimeString(time, 'time', { stepMinutes: 1 });
   const [hours, minutes] = time.split(':').map(Number);
   return hours * 60 + minutes;
 }
 
 function slotsForBooking(time) {
   const start = timeToMinutes(time);
-  return [minutesToTime(start), minutesToTime(start + 30)];
+  return Array.from({ length: 60 }, (_, i) => minutesToTime(start + i));
 }
 
 function isLockConflict(err) {

@@ -52,7 +52,7 @@ function parseDateString(value, label = 'date') {
   return value;
 }
 
-function parseTimeString(value, label = 'time', { stepMinutes = 30 } = {}) {
+function parseTimeString(value, label = 'time', { stepMinutes = 1 } = {}) {
   if (typeof value !== 'string' || !/^\d{2}:\d{2}$/.test(value)) {
     throw badRequest(`Invalid ${label}`);
   }

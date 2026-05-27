@@ -287,6 +287,8 @@ async function auditAndBackfillBookingLocks() {
      AND b.date = a.date
      AND b.status != 'Cancelled'
      AND a.status != 'Cancelled'
+     AND a.interaction_type NOT IN ('Walk-In', 'Crisis')
+     AND b.interaction_type NOT IN ('Walk-In', 'Crisis')
      AND a.assigned_to IS NOT NULL
      AND b.assigned_to IS NOT NULL
      AND a.assigned_to = b.assigned_to
@@ -304,12 +306,13 @@ async function auditAndBackfillBookingLocks() {
   }
 
   const activeBookings = await _client.execute(`
-    SELECT id, location, date, time_booked, assigned_to
+    SELECT id, location, date, time_booked, assigned_to, interaction_type
     FROM bookings
     WHERE status != 'Cancelled'
   `);
 
   for (const booking of activeBookings.rows) {
+    if (['Walk-In', 'Crisis'].includes(booking.interaction_type)) continue;
     const assignedTo = booking.assigned_to || '';
     for (const slot of slotsForBooking(booking.time_booked)) {
       await _client.execute({

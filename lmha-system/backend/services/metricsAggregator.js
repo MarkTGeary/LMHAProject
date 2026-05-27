@@ -28,10 +28,12 @@ async function aggregateMetrics(location, startDate, endDate) {
 
   const attended    = bookings.filter(b => b.outcome === 'Attended');
   const dna         = bookings.filter(b => b.outcome === 'Did Not Attend');
-  const phoneCalls  = bookings.filter(b => b.interaction_type === 'Phone Call');
+  const serviceBookings = bookings.filter(b => b.outcome !== 'Did Not Attend');
+  const phoneCalls  = serviceBookings.filter(b => b.interaction_type === 'Phone Call');
 
-  // Unique service users for demographics
-  const userIds = [...new Set(bookings.map(b => b.service_user_id).filter(Boolean))];
+  // Demographics are attendee metrics. Did-not-attend records are counted
+  // separately but must not inflate people/age/gender totals.
+  const userIds = [...new Set(attended.map(b => b.service_user_id).filter(Boolean))];
   let users = [];
   if (userIds.length) {
     const usersResult = await db.execute({
@@ -53,11 +55,11 @@ async function aggregateMetrics(location, startDate, endDate) {
   }
 
   function countNeed(key) {
-    return bookings.filter(b => parseJson(b.support_needs).includes(key)).length;
+    return serviceBookings.filter(b => parseJson(b.support_needs).includes(key)).length;
   }
 
   function countOnward(key) {
-    return bookings.filter(b => parseJson(b.onward_referrals).includes(key)).length;
+    return serviceBookings.filter(b => parseJson(b.onward_referrals).includes(key)).length;
   }
 
   function countLimitation(key) {
@@ -76,11 +78,11 @@ async function aggregateMetrics(location, startDate, endDate) {
   const s1 = {
     total_bookings_received:          bookings.length,
     total_attendees_through_bookings: attended.length,
-    total_walk_in_crisis: bookings.filter(b =>
+    total_walk_in_crisis: serviceBookings.filter(b =>
       b.interaction_type === 'Walk-In' && hasSupport(b, 'C')
     ).length,
     total_support_calls:    phoneCalls.length,
-    total_walk_in_social: bookings.filter(b =>
+    total_walk_in_social: serviceBookings.filter(b =>
       b.interaction_type === 'Walk-In' && hasSupport(b, 'SS')
     ).length,
     total_dna:              dna.length,
@@ -101,15 +103,15 @@ async function aggregateMetrics(location, startDate, endDate) {
 
   // --- Section 2: Support Requirements ---
   const s2 = {
-    information_seeking: bookings.filter(b =>
+    information_seeking: serviceBookings.filter(b =>
       parseJson(b.reasons_for_attending).includes('Information seeking')
     ).length,
-    social_support_signposting: bookings.filter(b =>
+    social_support_signposting: serviceBookings.filter(b =>
       hasSupport(b, 'SS') || hasSupport(b, 'SP')
     ).length,
-    one_to_one_peer_support: bookings.filter(b => hasSupport(b, 'PS')).length,
-    crisis_support:          bookings.filter(b => hasSupport(b, 'C')).length,
-    other_supports: bookings.filter(b =>
+    one_to_one_peer_support: serviceBookings.filter(b => hasSupport(b, 'PS')).length,
+    crisis_support:          serviceBookings.filter(b => hasSupport(b, 'C')).length,
+    other_supports: serviceBookings.filter(b =>
       hasSupport(b, 'O') ||
       ['Phone Call', 'Email', 'Text'].includes(b.interaction_type)
     ).length,
@@ -133,20 +135,20 @@ async function aggregateMetrics(location, startDate, endDate) {
 
   // --- Section 4: Referral Activity ---
   const s4 = {
-    self_referral:    bookings.filter(b => b.referral_source === 'Self-referral').length,
-    community_ngo:    bookings.filter(b => b.referral_source === 'Local NGO and Community Partner Agency').length,
-    hse_mh_services:  bookings.filter(b =>
+    self_referral:    serviceBookings.filter(b => b.referral_source === 'Self-referral').length,
+    community_ngo:    serviceBookings.filter(b => b.referral_source === 'Local NGO and Community Partner Agency').length,
+    hse_mh_services:  serviceBookings.filter(b =>
       ['Community Mental Health Team', 'Liaison Psychiatry Team', 'Crisis Resolution Team']
         .includes(b.referral_source)
     ).length,
-    hse_health_services: bookings.filter(b => b.referral_source === 'HSE Health Services').length,
-    gp:               bookings.filter(b => b.referral_source === 'GP').length,
-    other_referral:   bookings.filter(b => b.referral_source === 'Other').length,
-    cast_referral:    bookings.filter(b => b.referral_source === 'CAST').length,
-    lsw_referral:     bookings.filter(b => b.referral_source === 'LSW').length,
-    ltsp_referral:    bookings.filter(b => b.referral_source === 'LTSP').length,
-    probation_referral: bookings.filter(b => b.referral_source === 'Probation').length,
-    ed_diversion_yes: bookings.filter(b => b.ed_diversion === 1).length,
+    hse_health_services: serviceBookings.filter(b => b.referral_source === 'HSE Health Services').length,
+    gp:               serviceBookings.filter(b => b.referral_source === 'GP').length,
+    other_referral:   serviceBookings.filter(b => b.referral_source === 'Other').length,
+    cast_referral:    serviceBookings.filter(b => b.referral_source === 'CAST').length,
+    lsw_referral:     serviceBookings.filter(b => b.referral_source === 'LSW').length,
+    ltsp_referral:    serviceBookings.filter(b => b.referral_source === 'LTSP').length,
+    probation_referral: serviceBookings.filter(b => b.referral_source === 'Probation').length,
+    ed_diversion_yes: serviceBookings.filter(b => b.ed_diversion === 1).length,
   };
   s4.total = s4.self_referral + s4.community_ngo + s4.hse_mh_services +
              s4.hse_health_services + s4.gp + s4.other_referral +

@@ -28,6 +28,7 @@ const NEW_REPEAT = ['New', 'Repeat'];
 const SUPPORT_TYPES = ['SS', 'PS', 'C', 'O', 'SP'];
 const OUTCOMES = ['Attended', 'Did Not Attend', 'Pending'];
 const STATUSES = ['Active', 'Closed', 'Cancelled'];
+const OVERLAP_ALLOWED_TYPES = ['Crisis', 'Walk-In'];
 
 function localTodayStart() {
   const today = new Date();
@@ -53,7 +54,7 @@ function fmtDate(date) {
 
 function validateBookingTime(location, dateStr, timeStr, allowPast = false) {
   parseDateString(dateStr, 'booking date');
-  parseTimeString(timeStr, 'booking time');
+  parseTimeString(timeStr, 'booking time', { stepMinutes: 1 });
 
   const rules = LOCATION_RULES[location];
   if (!rules) return { valid: false, error: 'Unknown location' };
@@ -268,9 +269,7 @@ router.post('/', async (req, res, next) => {
     const location = assertRequestLocation(req, req.body.location);
     const date = parseDateString(req.body.date, 'date');
     const interaction_type = enumValue(req.body.interaction_type, INTERACTION_TYPES, 'interaction_type');
-    const flexibleTimingTypes = ['Walk-In', 'Crisis'];
-    const time_booked = parseTimeString(req.body.time_booked, 'time_booked',
-      { stepMinutes: flexibleTimingTypes.includes(interaction_type) ? 1 : 30 });
+    const time_booked = parseTimeString(req.body.time_booked, 'time_booked', { stepMinutes: 1 });
     const serviceUserId = parseId(req.body.service_user_id, 'service_user_id', { required: false });
     const fullName = normaliseString(req.body.full_name, 'full_name', { required: !serviceUserId, max: 200 });
     const phone = normaliseString(req.body.phone, 'phone', { max: 100 });
@@ -289,8 +288,7 @@ router.post('/', async (req, res, next) => {
     const timeValid = validateBookingTime(location, date, time_booked);
     if (!timeValid.valid) return res.status(400).json({ error: timeValid.error });
 
-    const skipDoubleBookingTypes = ['Crisis', 'Walk-In'];
-    if (!skipDoubleBookingTypes.includes(interaction_type)) {
+    if (!OVERLAP_ALLOWED_TYPES.includes(interaction_type)) {
       const existingConflict = await checkDoubleBooking(location, date, time_booked, assigned_to);
       if (existingConflict.conflict) throw conflict(existingConflict.message);
     }
@@ -332,7 +330,9 @@ router.post('/', async (req, res, next) => {
             ) VALUES (${serviceUserSql}, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Pending', 'Active', ?, ?)`,
       args: bookingArgs,
     });
-    statements.push(...lockInsertStatements(location, date, time_booked, assigned_to));
+    if (!OVERLAP_ALLOWED_TYPES.includes(interaction_type)) {
+      statements.push(...lockInsertStatements(location, date, time_booked, assigned_to));
+    }
 
     const batchResult = await db.batch(statements, 'write').catch(err => { throw toLockConflict(err); });
     const bookingId = Number(batchResult[bookingIndex].lastInsertRowid);
@@ -368,10 +368,7 @@ router.patch('/:id', async (req, res, next) => {
     if (hasOwn(req.body, 'date')) values.date = parseDateString(req.body.date, 'date');
     if (hasOwn(req.body, 'interaction_type')) values.interaction_type = enumValue(req.body.interaction_type, INTERACTION_TYPES, 'interaction_type');
     if (hasOwn(req.body, 'time_booked')) {
-      const resolvedType = values.interaction_type ?? existing.interaction_type;
-      const flexibleTimingTypes = ['Walk-In', 'Crisis'];
-      values.time_booked = parseTimeString(req.body.time_booked, 'time_booked',
-        { stepMinutes: flexibleTimingTypes.includes(resolvedType) ? 1 : 30 });
+      values.time_booked = parseTimeString(req.body.time_booked, 'time_booked', { stepMinutes: 1 });
     }
     if (hasOwn(req.body, 'new_or_repeat')) values.new_or_repeat = enumValue(req.body.new_or_repeat, NEW_REPEAT, 'new_or_repeat', { required: false });
     if (hasOwn(req.body, 'referred_from')) values.referred_from = normaliseString(req.body.referred_from, 'referred_from', { max: 200 });
@@ -398,11 +395,10 @@ router.patch('/:id', async (req, res, next) => {
     const newStatus = values.status ?? existing.status;
     const newAssignedTo = hasOwn(values, 'assigned_to') ? values.assigned_to : existing.assigned_to;
     const currentInteractionType = hasOwn(values, 'interaction_type') ? values.interaction_type : existing.interaction_type;
-    const skipDoubleBookingTypes = ['Crisis', 'Walk-In'];
     if (hasOwn(values, 'date') || hasOwn(values, 'time_booked') || hasOwn(values, 'assigned_to')) {
       const timeValid = validateBookingTime(existing.location, newDate, newTime, true);
       if (!timeValid.valid) return res.status(400).json({ error: timeValid.error });
-      if (!skipDoubleBookingTypes.includes(currentInteractionType)) {
+      if (!OVERLAP_ALLOWED_TYPES.includes(currentInteractionType)) {
         const existingConflict = await checkDoubleBooking(existing.location, newDate, newTime, newAssignedTo, id);
         if (existingConflict.conflict) throw conflict(existingConflict.message);
       }
@@ -442,7 +438,7 @@ router.patch('/:id', async (req, res, next) => {
       { sql: 'DELETE FROM booking_slot_locks WHERE booking_id = ?', args: [id] },
       { sql: `UPDATE bookings SET ${sets.join(', ')} WHERE id = ?`, args },
     ];
-    if (newStatus !== 'Cancelled') {
+    if (newStatus !== 'Cancelled' && !OVERLAP_ALLOWED_TYPES.includes(currentInteractionType)) {
       statements.push(...lockInsertStatements(existing.location, newDate, newTime, newAssignedTo, '?', [id]));
     }
 

@@ -3,6 +3,7 @@ const router = express.Router();
 const db = require('../db');
 const { getRootAdminEmail, isRootAdminEmail, normaliseEmail } = require('../lib/config');
 const { badRequest, conflict, forbidden, notFound } = require('../lib/errors');
+const { parseId } = require('../lib/validation');
 
 const ROLES = ['admin', 'worker'];
 
@@ -11,6 +12,64 @@ function normaliseRole(value) {
   if (!ROLES.includes(role)) throw badRequest('Invalid role');
   return role;
 }
+
+// POST /api/admin/service-users/:id/erase
+// Admin-only GDPR erasure: remove identifying fields while preserving anonymous
+// operational records needed for aggregate reporting.
+router.post('/service-users/:id/erase', async (req, res, next) => {
+  try {
+    const id = parseId(req.params.id, 'service_user_id');
+    const existing = await db.execute({
+      sql: 'SELECT id FROM service_users WHERE id = ?',
+      args: [id],
+    });
+    if (!existing.rows.length) throw notFound('Service user not found');
+
+    const erasedName = `Erased service user #${id}`;
+    await db.batch([
+      {
+        sql: `UPDATE service_users SET
+                full_name = ?,
+                phone = NULL,
+                email = NULL,
+                age_group = NULL,
+                gender = NULL,
+                living_alone = NULL,
+                english_speaking = NULL,
+                translator_required = NULL,
+                translator_language = NULL,
+                address = NULL,
+                emergency_contact_name = NULL,
+                emergency_contact_relationship = NULL,
+                emergency_contact_phone = NULL,
+                gp_name = NULL,
+                gp_phone = NULL
+              WHERE id = ?`,
+        args: [erasedName, id],
+      },
+      {
+        sql: `UPDATE bookings SET
+                notes = NULL,
+                limitations = NULL,
+                peer_support_worker = NULL
+              WHERE service_user_id = ?`,
+        args: [id],
+      },
+      {
+        sql: `UPDATE intake_forms SET
+                referred_by_name = NULL,
+                referred_by_role = NULL,
+                referred_by_phone = NULL,
+                referred_by_email = NULL,
+                staff_signature = NULL
+              WHERE service_user_id = ?`,
+        args: [id],
+      },
+    ], 'write');
+
+    res.json({ ok: true, id, full_name: erasedName });
+  } catch (err) { next(err); }
+});
 
 // GET /api/admin/emails
 router.get('/emails', async (req, res, next) => {

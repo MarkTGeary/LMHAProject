@@ -20,6 +20,8 @@ const app = require('../server');
 const db = require('../db');
 const { AUTH_COOKIE_NAME } = require('../lib/config');
 const { createAuthToken } = require('../lib/authTokens');
+const { slotsForBooking } = require('../lib/bookingLocks');
+const { aggregateMetrics } = require('../services/metricsAggregator');
 
 function localDate(date) {
   return [
@@ -156,14 +158,35 @@ test('booking creation rejects location mismatches and invalid input', async () 
     .send({
       location: 'LMHA',
       date,
-      time_booked: '11:15',
+      time_booked: '25:00',
       interaction_type: 'Walk-In',
       full_name: 'Invalid Time',
     })
     .expect(400);
 });
 
-test('booking slot locks reject overlapping bookings', async () => {
+test('bookings accept retrospective custom times', async () => {
+  const d = new Date();
+  d.setDate(d.getDate() - 7);
+
+  const res = await request(app)
+    .post('/api/bookings')
+    .set('Cookie', staff.cookie)
+    .set('X-CSRF-Token', staff.csrfToken)
+    .set('X-Location', 'LMHA')
+    .send({
+      location: 'LMHA',
+      date: localDate(d),
+      time_booked: '18:17',
+      interaction_type: 'Phone Call',
+      full_name: 'Retrospective Phone Call',
+    })
+    .expect(201);
+
+  assert.equal(res.body.time_booked, '18:17');
+});
+
+test('assigned scheduled bookings lock slots but walk-ins can overlap', async () => {
   const date = nextWeekday(1);
   const first = await request(app)
     .post('/api/bookings')
@@ -174,8 +197,9 @@ test('booking slot locks reject overlapping bookings', async () => {
       location: 'LMHA',
       date,
       time_booked: '11:00',
-      interaction_type: 'Walk-In',
-      full_name: 'First Booking',
+      interaction_type: 'Phone Call',
+      assigned_to: 'staff@example.com',
+      full_name: 'First Scheduled Booking',
     })
     .expect(201);
 
@@ -190,18 +214,26 @@ test('booking slot locks reject overlapping bookings', async () => {
       location: 'LMHA',
       date,
       time_booked: '11:30',
-      interaction_type: 'Walk-In',
-      full_name: 'Overlap Booking',
+      interaction_type: 'Phone Call',
+      assigned_to: 'staff@example.com',
+      full_name: 'Overlap Scheduled Booking',
     })
     .expect(409);
 
   await request(app)
-    .patch(`/api/bookings/${first.body.id}`)
+    .post('/api/bookings')
     .set('Cookie', staff.cookie)
     .set('X-CSRF-Token', staff.csrfToken)
     .set('X-Location', 'LMHA')
-    .send({ status: 'Cancelled' })
-    .expect(200);
+    .send({
+      location: 'LMHA',
+      date,
+      time_booked: '11:30',
+      interaction_type: 'Phone Call',
+      assigned_to: 'admin@example.com',
+      full_name: 'Different Worker Booking',
+    })
+    .expect(201);
 
   await request(app)
     .post('/api/bookings')
@@ -213,9 +245,16 @@ test('booking slot locks reject overlapping bookings', async () => {
       date,
       time_booked: '11:30',
       interaction_type: 'Walk-In',
-      full_name: 'Post Cancel Booking',
+      assigned_to: 'staff@example.com',
+      full_name: 'Overlapping Walk In',
     })
     .expect(201);
+});
+
+test('custom-time booking locks overlap at minute granularity', () => {
+  const first = new Set(slotsForBooking('11:15'));
+  assert.equal(slotsForBooking('12:10').some(slot => first.has(slot)), true);
+  assert.equal(slotsForBooking('12:15').some(slot => first.has(slot)), false);
 });
 
 test('outcome session times accept non-slot minutes', async () => {
@@ -251,6 +290,64 @@ test('outcome session times accept non-slot minutes', async () => {
   assert.equal(updated.body.time_out, '13:40');
 });
 
+test('metrics exclude did-not-attend records from people and support totals', async () => {
+  const date = '2035-01-02';
+  const attended = await request(app)
+    .post('/api/bookings')
+    .set('Cookie', staff.cookie)
+    .set('X-CSRF-Token', staff.csrfToken)
+    .set('X-Location', 'LMHA')
+    .send({
+      location: 'LMHA',
+      date,
+      time_booked: '08:01',
+      interaction_type: 'Walk-In',
+      full_name: 'Metrics Attended',
+      new_or_repeat: 'New',
+      type_of_support: ['SS'],
+    })
+    .expect(201);
+
+  const dna = await request(app)
+    .post('/api/bookings')
+    .set('Cookie', staff.cookie)
+    .set('X-CSRF-Token', staff.csrfToken)
+    .set('X-Location', 'LMHA')
+    .send({
+      location: 'LMHA',
+      date,
+      time_booked: '08:02',
+      interaction_type: 'Walk-In',
+      full_name: 'Metrics DNA',
+      new_or_repeat: 'Repeat',
+      type_of_support: ['PS'],
+    })
+    .expect(201);
+
+  await request(app)
+    .patch(`/api/bookings/${attended.body.id}`)
+    .set('Cookie', staff.cookie)
+    .set('X-CSRF-Token', staff.csrfToken)
+    .set('X-Location', 'LMHA')
+    .send({ outcome: 'Attended' })
+    .expect(200);
+
+  await request(app)
+    .patch(`/api/bookings/${dna.body.id}`)
+    .set('Cookie', staff.cookie)
+    .set('X-CSRF-Token', staff.csrfToken)
+    .set('X-Location', 'LMHA')
+    .send({ outcome: 'Did Not Attend' })
+    .expect(200);
+
+  const metrics = await aggregateMetrics('LMHA', date, date);
+  assert.equal(metrics.section1.total_bookings_received, 2);
+  assert.equal(metrics.section1.total_dna, 1);
+  assert.equal(metrics.section1.total_people, 1);
+  assert.equal(metrics.section2.social_support_signposting, 1);
+  assert.equal(metrics.section2.one_to_one_peer_support, 0);
+});
+
 test('metrics feedback is scoped to current location', async () => {
   await request(app)
     .post('/api/metrics/feedback')
@@ -263,6 +360,50 @@ test('metrics feedback is scoped to current location', async () => {
       thankyou_letters: 1,
     })
     .expect(403);
+});
+
+test('admins can erase service user personal data', async () => {
+  const date = nextWeekday(3);
+  const booking = await request(app)
+    .post('/api/bookings')
+    .set('Cookie', staff.cookie)
+    .set('X-CSRF-Token', staff.csrfToken)
+    .set('X-Location', 'LMHA')
+    .send({
+      location: 'LMHA',
+      date,
+      time_booked: '12:17',
+      interaction_type: 'Phone Call',
+      full_name: 'Erase Me',
+      phone: '12345',
+      notes: 'Identifying note',
+    })
+    .expect(201);
+
+  await request(app)
+    .post(`/api/admin/service-users/${booking.body.service_user_id}/erase`)
+    .set('Cookie', staff.cookie)
+    .set('X-CSRF-Token', staff.csrfToken)
+    .expect(403);
+
+  await request(app)
+    .post(`/api/admin/service-users/${booking.body.service_user_id}/erase`)
+    .set('Cookie', admin.cookie)
+    .set('X-CSRF-Token', admin.csrfToken)
+    .expect(200);
+
+  const erased = await db.execute({
+    sql: 'SELECT full_name, phone FROM service_users WHERE id = ?',
+    args: [booking.body.service_user_id],
+  });
+  assert.equal(erased.rows[0].full_name, `Erased service user #${booking.body.service_user_id}`);
+  assert.equal(erased.rows[0].phone, null);
+
+  const record = await db.execute({
+    sql: 'SELECT notes FROM bookings WHERE id = ?',
+    args: [booking.body.id],
+  });
+  assert.equal(record.rows[0].notes, null);
 });
 
 test('revoked allowlist users are rejected on subsequent requests', async () => {

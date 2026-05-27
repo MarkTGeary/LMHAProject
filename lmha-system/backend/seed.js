@@ -78,7 +78,7 @@ const bk = db.prepare(`
 const b1 = bk.run(u1, 'LMHA', todayLMHA, '11:00', '11:03', null, 'Walk-In', 'New', 'Self-referral', '["SS"]', 0, null, null, 0, 'Attended', 'Active', 'Walk-in, seemed anxious').lastInsertRowid;
 const b2 = bk.run(u2, 'LMHA', todayLMHA, '12:00', '12:05', null, 'Peer Support Booking', 'Repeat', 'GP', '["PS"]', 0, 'Sean O\'Sullivan', null, 0, 'Pending', 'Active', null).lastInsertRowid;
 const b3 = bk.run(u3, 'LMHA', todayLMHA, '13:00', null, null, 'Phone Call', 'New', 'Self-referral', null, 0, null, null, null, 'Pending', 'Active', 'Called this morning, first contact').lastInsertRowid;
-const b4 = bk.run(u4, 'LMHA', todayLMHA, '14:00', null, null, 'Scheduled', 'Repeat', 'HSE', '["PS","SS"]', 1, 'Sean O\'Sullivan', null, 1, 'Pending', 'Active', 'Wife accompanying').lastInsertRowid;
+const b4 = bk.run(u4, 'LMHA', todayLMHA, '14:00', null, null, 'Phone Call', 'Repeat', 'HSE', '["PS","SS"]', 1, 'Sean O\'Sullivan', null, 1, 'Pending', 'Active', 'Wife accompanying').lastInsertRowid;
 const b5 = bk.run(u5, 'LMHA', todayLMHA, '15:00', null, null, 'Walk-In', 'New', null, null, 0, null, null, null, 'Pending', 'Active', null).lastInsertRowid;
 
 // Past LMHA bookings (closed)
@@ -99,9 +99,9 @@ const nextThu = nextWeekday(4);
 
 const b10 = bk.run(u2, 'LMHA', nextMon, '11:00', null, null, 'Peer Support Booking', 'Repeat', 'GP', null, 0, 'Sean O\'Sullivan', null, null, 'Pending', 'Active', null).lastInsertRowid;
 const b11 = bk.run(u9, 'LMHA', nextMon, '13:00', null, null, 'Phone Call', 'New', 'Self-referral', null, 0, null, null, null, 'Pending', 'Active', 'Rang Monday morning, sounded distressed').lastInsertRowid;
-const b12 = bk.run(u3, 'LMHA', nextTue, '11:00', null, null, 'Scheduled', 'New', 'Self-referral', null, 0, null, null, null, 'Pending', 'Active', null).lastInsertRowid;
+const b12 = bk.run(u3, 'LMHA', nextTue, '11:00', null, null, 'Phone Call', 'New', 'Self-referral', null, 0, null, null, null, 'Pending', 'Active', null).lastInsertRowid;
 const b13 = bk.run(u5, 'LMHA', nextWed, '14:00', null, null, 'Walk-In', 'New', null, null, 0, null, null, null, 'Pending', 'Active', null).lastInsertRowid;
-const b14 = bk.run(u4, 'LMHA', nextThu, '12:00', null, null, 'Scheduled', 'Repeat', 'HSE', null, 0, 'Sean O\'Sullivan', null, null, 'Pending', 'Active', null).lastInsertRowid;
+const b14 = bk.run(u4, 'LMHA', nextThu, '12:00', null, null, 'Phone Call', 'Repeat', 'HSE', null, 0, 'Sean O\'Sullivan', null, null, 'Pending', 'Active', null).lastInsertRowid;
 
 // ─── SOLACE CAFÉ BOOKINGS ────────────────────────────────────────────────────
 
@@ -135,7 +135,7 @@ bk.run(u10, 'Solace Café', lastSat, '20:00', '20:20', '21:30', 'Walk-In', 'Repe
 // Future Solace bookings
 bk.run(u3, 'Solace Café', nextFri, '18:00', null, null, 'Peer Support Booking', 'New', 'NGO', null, 0, 'Sean O\'Sullivan', null, null, 'Pending', 'Active', null);
 bk.run(u5, 'Solace Café', nextFri, '20:00', null, null, 'Walk-In', 'New', null, null, 0, null, null, null, 'Pending', 'Active', null);
-bk.run(u7, 'Solace Café', nextSat, '19:00', null, null, 'Scheduled', 'Repeat', null, null, 0, null, null, null, 'Pending', 'Active', null);
+bk.run(u7, 'Solace Café', nextSat, '19:00', null, null, 'Phone Call', 'Repeat', null, null, 0, null, null, null, 'Pending', 'Active', null);
 bk.run(u4, 'Solace Café', nextSun, '18:00', null, null, 'Phone Call', 'Repeat', 'GP', null, 0, null, null, null, 'Pending', 'Active', null);
 
 // ─── INTAKE FORMS ───────────────────────────────────────────────────────────
@@ -150,12 +150,12 @@ const intake = db.prepare(`
 
 // Add intakes for closed bookings and some active ones
 intake.run(b6, u6, 'Self-referral', null, null, null, '["Feeling unable to cope or in crisis","Looking for Social Support"]', lastMon);
-intake.run(b7, u7, 'Primary Care Provider', 'Dr. Walsh', 'GP', '061-234567', '["Looking for Peer support","Information seeking"]', lastMon);
+intake.run(b7, u7, 'GP', 'Dr. Walsh', 'GP', '061-234567', '["Looking for Peer support","Information seeking"]', lastMon);
 intake.run(b9, u10, 'Community Mental Health Team', 'Dr. Brennan', 'Psychiatrist', '061-456789', '["Feeling unable to cope or in crisis"]', lastFri);
 
 // Some active bookings also have intake
 intake.run(b1, u1, 'Self-referral', null, null, null, '["Looking for Social Support","Information seeking"]', todayLMHA);
-intake.run(b2, u2, 'Primary Care Provider', 'Dr. Walsh', 'GP', '061-234567', '["Looking for Peer support"]', todayLMHA);
+intake.run(b2, u2, 'GP', 'Dr. Walsh', 'GP', '061-234567', '["Looking for Peer support"]', todayLMHA);
 
 // Update ed_diversion on bookings that have it in intake
 db.prepare('UPDATE bookings SET ed_diversion = 0 WHERE id = ?').run(b6);

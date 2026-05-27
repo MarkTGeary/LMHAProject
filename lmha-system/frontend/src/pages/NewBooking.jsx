@@ -223,16 +223,24 @@ export default function NewBooking({ editMode }) {
 
           <div className="field">
             <label className="label">Time <span className="text-red-500">*</span></label>
-            {form.date && !dayInvalid ? (
-              slotsLoading ? (
+            {form.date ? (
+              dayInvalid ? (
+                <div>
+                  <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mb-2">
+                    Outside normal operating days — enter the actual time.
+                  </p>
+                  <input type="time" className="input" value={form.time_booked}
+                    onChange={e => set('time_booked', e.target.value)} step="60" />
+                </div>
+              ) : slotsLoading ? (
                 <div className="text-gray-500 text-sm py-3">Loading available slots...</div>
               ) : emergencyMode ? (
                 <div>
                   <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mb-2">
-                    Emergency booking — enter any time within operating hours.
+                    Emergency booking — enter any time.
                   </p>
                   <input type="time" className="input" value={form.time_booked}
-                    onChange={e => set('time_booked', e.target.value)} min="18:00" max="23:00" step="300" />
+                    onChange={e => set('time_booked', e.target.value)} step="60" />
                 </div>
               ) : flexibleTiming ? (
                 <div>
@@ -285,14 +293,14 @@ export default function NewBooking({ editMode }) {
               </div>
             )}
 
-            {['Walk-In', 'Crisis'].includes(form.interaction_type) && form.date && !dayInvalid && !slotsLoading && !emergencyMode && (
+            {form.date && !dayInvalid && !slotsLoading && !emergencyMode && (
               <div className="mt-3">
                 <button
                   type="button"
                   onClick={() => { setFlexibleTiming(m => !m); set('time_booked', '') }}
                   className="text-sm text-blue-600 underline hover:text-blue-700"
                 >
-                  {flexibleTiming ? '← Back to standard slots' : 'Flexible timing — walk-in arrived off-schedule'}
+                  {flexibleTiming ? '← Back to standard slots' : 'Enter a custom time'}
                 </button>
               </div>
             )}

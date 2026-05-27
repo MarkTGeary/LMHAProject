@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import Layout from '../components/Layout'
 import { apiFetch } from '../lib/api'
 import { useAuth } from '../App'
+import RepeatUserSearch from '../components/RepeatUserSearch'
 
 export default function Settings() {
   const { user } = useAuth()
@@ -12,6 +13,9 @@ export default function Settings() {
   const [loading, setLoading] = useState(true)
   const [adding, setAdding] = useState(false)
   const [updating, setUpdating] = useState('')
+  const [eraseId, setEraseId] = useState('')
+  const [eraseUser, setEraseUser] = useState(null)
+  const [erasing, setErasing] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
 
@@ -75,6 +79,24 @@ export default function Settings() {
     if (!res.ok) { setError(data.error || 'Failed to remove'); return }
     setSuccess(`${email} removed`)
     load()
+  }
+
+  const eraseServiceUser = async () => {
+    setError('')
+    setSuccess('')
+    const id = eraseId.trim()
+    if (!id || !/^\d+$/.test(id)) { setError('Enter a valid service user ID'); return }
+    if (!window.confirm(`Erase personal data for service user #${id}? This keeps anonymous case records for reporting but removes identifying details.`)) return
+    setErasing(true)
+    const res = await apiFetch(`/api/admin/service-users/${encodeURIComponent(id)}/erase`, {
+      method: 'POST',
+    })
+    const data = await res.json()
+    setErasing(false)
+    if (!res.ok) { setError(data.error || 'Failed to erase personal data'); return }
+    setEraseId('')
+    setEraseUser(null)
+    setSuccess(`Personal data erased for service user #${id}`)
   }
 
   return (
@@ -206,6 +228,40 @@ export default function Settings() {
                 )
               })}
             </ul>
+          )}
+        </div>
+
+        <div className="card">
+          <h2 className="text-xl font-bold mb-1">GDPR Erasure</h2>
+          <p className="text-sm text-gray-500 mb-5">
+            Remove identifying details for a service user while keeping anonymous case records for metrics.
+          </p>
+          <div className="mb-3">
+            <RepeatUserSearch
+              onSelect={u => { setEraseUser(u); setEraseId(String(u.id)); setError(''); setSuccess('') }}
+              onClear={() => { setEraseUser(null); setEraseId('') }}
+            />
+          </div>
+          <div className="flex gap-2">
+            <input
+              className="input"
+              inputMode="numeric"
+              placeholder="Service user ID"
+              value={eraseId}
+              onChange={e => { setEraseId(e.target.value); setEraseUser(null); setError(''); setSuccess('') }}
+            />
+            <button
+              onClick={eraseServiceUser}
+              disabled={erasing || !eraseId.trim()}
+              className="btn-danger px-5"
+            >
+              {erasing ? 'Erasing...' : 'Erase'}
+            </button>
+          </div>
+          {eraseUser && (
+            <p className="text-xs text-gray-400 mt-2">
+              Selected: {eraseUser.full_name}
+            </p>
           )}
         </div>
 
