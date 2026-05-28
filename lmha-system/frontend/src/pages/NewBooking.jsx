@@ -18,7 +18,7 @@ const REFERRED_FROM = ['Self-referral', 'NGO', 'HSE', 'GP', 'Other']
 
 function isDayValid(dateStr, location) {
   if (!dateStr || !location) return true
-  const d = new Date(dateStr)
+  const d = new Date(dateStr + 'T12:00:00')
   const day = d.getDay()
   return LOCATION_RULES[location]?.days.includes(day)
 }
@@ -274,9 +274,17 @@ export default function NewBooking({ editMode }) {
                 <input type="time" className="input" value={form.time_booked}
                   onChange={e => set('time_booked', e.target.value)} />
               )
+            ) : form.date ? (
+              <div>
+                <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mb-2">
+                  Off-schedule date — enter time manually.
+                </p>
+                <input type="time" className="input" value={form.time_booked}
+                  onChange={e => set('time_booked', e.target.value)} step="60" />
+              </div>
             ) : (
               <div className="input bg-gray-100 text-gray-400 cursor-not-allowed">
-                Select a valid date first
+                Select a date first
               </div>
             )}
 
