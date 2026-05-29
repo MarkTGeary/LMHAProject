@@ -52,9 +52,9 @@ function fmtDate(date) {
   ].join('-');
 }
 
-function validateBookingTime(location, dateStr, timeStr, allowPast = false) {
+function validateBookingTime(location, dateStr, timeStr) {
   parseDateString(dateStr, 'booking date');
-  parseTimeString(timeStr, 'booking time', { stepMinutes: 1 });
+  parseTimeString(timeStr, 'booking time', { stepMinutes: 0 });
 
   const rules = LOCATION_RULES[location];
   if (!rules) return { valid: false, error: 'Unknown location' };
@@ -396,7 +396,7 @@ router.patch('/:id', async (req, res, next) => {
     const newAssignedTo = hasOwn(values, 'assigned_to') ? values.assigned_to : existing.assigned_to;
     const currentInteractionType = hasOwn(values, 'interaction_type') ? values.interaction_type : existing.interaction_type;
     if (hasOwn(values, 'date') || hasOwn(values, 'time_booked') || hasOwn(values, 'assigned_to')) {
-      const timeValid = validateBookingTime(existing.location, newDate, newTime, true);
+      const timeValid = validateBookingTime(existing.location, newDate, newTime);
       if (!timeValid.valid) return res.status(400).json({ error: timeValid.error });
       if (!OVERLAP_ALLOWED_TYPES.includes(currentInteractionType)) {
         const existingConflict = await checkDoubleBooking(existing.location, newDate, newTime, newAssignedTo, id);
