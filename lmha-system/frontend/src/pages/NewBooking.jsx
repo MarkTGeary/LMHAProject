@@ -10,6 +10,7 @@ const INTERACTION_TYPES = [
   { value: 'Phone Call', icon: '📞', color: 'bg-green-100 border-green-400 text-green-800' },
   { value: 'Walk-In', icon: '🚶', color: 'bg-blue-100 border-blue-400 text-blue-800' },
   { value: 'Crisis', icon: '🚨', color: 'bg-red-100 border-red-400 text-red-800' },
+  { value: 'Peer Support Booking', label: 'Peer Support', icon: '🤝', color: 'bg-purple-100 border-purple-400 text-purple-800' },
   { value: 'Email', icon: '✉️', color: 'bg-yellow-100 border-yellow-400 text-yellow-800' },
   { value: 'Text', icon: '💬', color: 'bg-indigo-100 border-indigo-400 text-indigo-800' },
 ]
@@ -321,7 +322,7 @@ export default function NewBooking({ editMode }) {
           <div className="field">
             <label className="label">Interaction Type <span className="text-red-500">*</span></label>
             <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-              {INTERACTION_TYPES.map(({ value, icon, color }) => (
+              {INTERACTION_TYPES.map(({ value, label, icon, color }) => (
                 <button
                   key={value}
                   onClick={() => set('interaction_type', value)}
@@ -331,7 +332,7 @@ export default function NewBooking({ editMode }) {
                       : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'
                   }`}
                 >
-                  {icon} {value}
+                  {icon} {label || value}
                 </button>
               ))}
             </div>

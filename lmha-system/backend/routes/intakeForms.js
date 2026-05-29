@@ -110,6 +110,26 @@ function nullableJson(values) {
   return values.length ? JSON.stringify(values) : null;
 }
 
+function serviceUserSelect(prefix = 'su') {
+  return `
+    ${prefix}.full_name,
+    ${prefix}.phone,
+    ${prefix}.email,
+    ${prefix}.age_group,
+    ${prefix}.gender,
+    ${prefix}.living_alone,
+    ${prefix}.english_speaking,
+    ${prefix}.translator_required,
+    ${prefix}.translator_language,
+    ${prefix}.address,
+    ${prefix}.emergency_contact_name,
+    ${prefix}.emergency_contact_relationship,
+    ${prefix}.emergency_contact_phone,
+    ${prefix}.gp_name,
+    ${prefix}.gp_phone
+  `;
+}
+
 function normaliseServiceUserFields(body) {
   return {
     full_name: hasOwn(body, 'full_name') ? normaliseString(body.full_name, 'full_name', { max: 200 }) : undefined,
@@ -144,7 +164,10 @@ router.get('/booking/:bookingId', async (req, res, next) => {
     }
 
     const result = await db.execute({
-      sql: 'SELECT * FROM intake_forms WHERE booking_id = ?',
+      sql: `SELECT i.*, ${serviceUserSelect('su')}
+            FROM intake_forms i
+            LEFT JOIN service_users su ON su.id = i.service_user_id
+            WHERE i.booking_id = ?`,
       args: [bookingId],
     });
     if (!result.rows.length) throw notFound('No intake form for this booking');

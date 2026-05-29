@@ -49,6 +49,7 @@ function authFor(email) {
 const admin = authFor('admin@example.com');
 const configAdmin = authFor('configadmin@example.com');
 const staff = authFor('staff@example.com');
+const SOLACE_LOCATION_HEADER = encodeURIComponent('Solace Café');
 
 before(async () => {
   await db.ready;
@@ -346,6 +347,119 @@ test('metrics exclude did-not-attend records from people and support totals', as
   assert.equal(metrics.section1.total_people, 1);
   assert.equal(metrics.section2.social_support_signposting, 1);
   assert.equal(metrics.section2.one_to_one_peer_support, 0);
+});
+
+test('solace intake view returns saved person details and intake edits update age metrics', async () => {
+  const date = '2035-03-04';
+  const booking = await request(app)
+    .post('/api/bookings')
+    .set('Cookie', staff.cookie)
+    .set('X-CSRF-Token', staff.csrfToken)
+    .set('X-Location', SOLACE_LOCATION_HEADER)
+    .send({
+      location: 'Solace Café',
+      date,
+      time_booked: '19:00',
+      interaction_type: 'Peer Support Booking',
+      full_name: 'Benjamin Solace',
+      new_or_repeat: 'New',
+    })
+    .expect(201);
+
+  const intakePayload = (ageGroup) => ({
+    booking_id: booking.body.id,
+    service_user_id: booking.body.service_user_id,
+    is_repeat: false,
+    full_name: 'Benjamin Solace',
+    phone: '061-000000',
+    age_group: ageGroup,
+    gender: 'Male',
+    living_alone: 'No',
+    english_speaking: 'Yes',
+    emergency_contact_name: 'N/A',
+    emergency_contact_relationship: 'N/A',
+    emergency_contact_phone: 'N/A',
+    gp_name: 'N/A',
+    gp_phone: 'N/A',
+    privacy_acknowledged: true,
+    safety_agreement_acknowledged: true,
+    confidentiality_limits_explained: true,
+    signed_date: date,
+    reasons_for_attending: ['Looking for Peer support'],
+    support_needs: ['peer_coping'],
+  });
+
+  await request(app)
+    .post('/api/intake-forms')
+    .set('Cookie', staff.cookie)
+    .set('X-CSRF-Token', staff.csrfToken)
+    .set('X-Location', SOLACE_LOCATION_HEADER)
+    .send(intakePayload('18-24'))
+    .expect(201);
+
+  const intake = await request(app)
+    .get(`/api/intake-forms/booking/${booking.body.id}`)
+    .set('Cookie', staff.cookie)
+    .set('X-Location', SOLACE_LOCATION_HEADER)
+    .expect(200);
+
+  assert.equal(intake.body.full_name, 'Benjamin Solace');
+  assert.equal(intake.body.phone, '061-000000');
+  assert.equal(intake.body.age_group, '18-24');
+  assert.equal(intake.body.living_alone, 'No');
+
+  let metrics = await aggregateMetrics('Solace Café', date, date);
+  assert.equal(metrics.section1.total_bookings_received, 1);
+  assert.equal(metrics.section1.total_people, 1);
+  assert.equal(metrics.section1.age_18_24, 1);
+  assert.equal(metrics.section1.age_25_34, 0);
+
+  await request(app)
+    .post('/api/intake-forms')
+    .set('Cookie', staff.cookie)
+    .set('X-CSRF-Token', staff.csrfToken)
+    .set('X-Location', SOLACE_LOCATION_HEADER)
+    .send(intakePayload('25-34'))
+    .expect(201);
+
+  metrics = await aggregateMetrics('Solace Café', date, date);
+  assert.equal(metrics.section1.age_18_24, 0);
+  assert.equal(metrics.section1.age_25_34, 1);
+});
+
+test('pending phone bookings count as bookings received but not support calls', async () => {
+  const date = '2035-03-05';
+  const booking = await request(app)
+    .post('/api/bookings')
+    .set('Cookie', staff.cookie)
+    .set('X-CSRF-Token', staff.csrfToken)
+    .set('X-Location', SOLACE_LOCATION_HEADER)
+    .send({
+      location: 'Solace Café',
+      date,
+      time_booked: '19:30',
+      interaction_type: 'Phone Call',
+      full_name: 'Phone Booking Only',
+      new_or_repeat: 'New',
+    })
+    .expect(201);
+
+  let metrics = await aggregateMetrics('Solace Café', date, date);
+  assert.equal(metrics.section1.total_bookings_received, 1);
+  assert.equal(metrics.section1.total_support_calls, 0);
+  assert.equal(metrics.section2.other_supports, 0);
+
+  await request(app)
+    .patch(`/api/bookings/${booking.body.id}`)
+    .set('Cookie', staff.cookie)
+    .set('X-CSRF-Token', staff.csrfToken)
+    .set('X-Location', SOLACE_LOCATION_HEADER)
+    .send({ outcome: 'Attended' })
+    .expect(200);
+
+  metrics = await aggregateMetrics('Solace Café', date, date);
+  assert.equal(metrics.section1.total_support_calls, 1);
+  assert.equal(metrics.section2.other_supports, 1);
 });
 
 test('metrics feedback is scoped to current location', async () => {

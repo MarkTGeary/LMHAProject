@@ -222,6 +222,29 @@ export default function IntakeForm() {
     limitations_detail: [],
   })
 
+  const applyServiceUserFields = (data) => {
+    if (!data) return
+    setSu(prev => ({
+      ...prev,
+      full_name: data.full_name || prev.full_name,
+      phone: data.phone || prev.phone,
+      email: data.email || prev.email,
+      age_group: data.age_group || prev.age_group,
+      gender: data.gender || prev.gender,
+      living_alone: data.living_alone || prev.living_alone,
+      english_speaking: data.english_speaking || prev.english_speaking,
+      translator_required: data.translator_required || prev.translator_required,
+      translator_language: data.translator_language || prev.translator_language,
+      address: data.address || prev.address,
+      emergency_contact_name: data.emergency_contact_name || prev.emergency_contact_name,
+      emergency_contact_relationship: data.emergency_contact_relationship || prev.emergency_contact_relationship,
+      emergency_contact_phone: data.emergency_contact_phone || prev.emergency_contact_phone,
+      gp_name: data.gp_name || prev.gp_name,
+      gp_phone: data.gp_phone || prev.gp_phone,
+      ed_diversion: data.ed_diversion ?? prev.ed_diversion,
+    }))
+  }
+
   useEffect(() => {
     Promise.all([
       apiFetch(`/api/bookings/${bookingId}`).then(r => r.json()),
@@ -237,6 +260,7 @@ export default function IntakeForm() {
       if (b.new_or_repeat === 'Repeat') setIsRepeat(true)
       if (intake) {
         setExistingIntake(intake)
+        applyServiceUserFields(intake)
         setP2({
           referral_source: intake.referral_source || '',
           referred_by_name: intake.referred_by_name || '',
@@ -263,26 +287,8 @@ export default function IntakeForm() {
     if (booking?.service_user_id) {
       apiFetch(`/api/service-users/${booking.service_user_id}`)
         .then(r => r.json())
-        .then(data => {
-          setSu(prev => ({
-            full_name: data.full_name || prev.full_name,
-            phone: data.phone || prev.phone,
-            email: data.email || prev.email,
-            age_group: data.age_group || prev.age_group,
-            gender: data.gender || prev.gender,
-            living_alone: data.living_alone || prev.living_alone,
-            english_speaking: data.english_speaking || prev.english_speaking,
-            translator_required: data.translator_required || prev.translator_required,
-            translator_language: data.translator_language || prev.translator_language,
-            address: data.address || prev.address,
-            emergency_contact_name: data.emergency_contact_name || prev.emergency_contact_name,
-            emergency_contact_relationship: data.emergency_contact_relationship || prev.emergency_contact_relationship,
-            emergency_contact_phone: data.emergency_contact_phone || prev.emergency_contact_phone,
-            gp_name: data.gp_name || prev.gp_name,
-            gp_phone: data.gp_phone || prev.gp_phone,
-            ed_diversion: booking.ed_diversion ?? null,
-          }))
-        }).catch(() => {})
+        .then(data => applyServiceUserFields({ ...data, ed_diversion: booking.ed_diversion ?? null }))
+        .catch(() => {})
     }
   }, [booking])
 
@@ -437,11 +443,7 @@ export default function IntakeForm() {
             )}
           </div>
 
-
-          {/* Only show full form if not repeat (or if editing) */}
-          {(!isRepeat || existingIntake) && (
-            <>
-              <div className="card">
+          <div className="card">
                 <h2 className="text-xl font-bold mb-4">Personal Information</h2>
 
                 <div className="field">
@@ -491,9 +493,9 @@ export default function IntakeForm() {
                   <label className="label">Email (optional, for updates)</label>
                   <input className="input" type="email" value={su.email} onChange={e => setSuField('email', e.target.value)} />
                 </div>
-              </div>
+          </div>
 
-              <div className="card">
+          <div className="card">
                 <div className="flex items-center justify-between mb-4">
                   <h2 className="text-xl font-bold">Emergency Contact</h2>
                   <button
@@ -525,9 +527,9 @@ export default function IntakeForm() {
                     onChange={e => setSuField('emergency_contact_phone', e.target.value)}
                     placeholder="Phone number or N/A" />
                 </div>
-              </div>
+          </div>
 
-              <div className="card">
+          <div className="card">
                 <div className="flex items-center justify-between mb-4">
                   <h2 className="text-xl font-bold">GP Details</h2>
                   <button
@@ -546,9 +548,7 @@ export default function IntakeForm() {
                   <label className="label">GP Phone</label>
                   <input className="input" type="tel" value={su.gp_phone} onChange={e => setSuField('gp_phone', e.target.value)} />
                 </div>
-              </div>
-            </>
-          )}
+          </div>
 
           {/* ED Diversion — always shown */}
           <div className="card border-2 border-amber-300 bg-amber-50">

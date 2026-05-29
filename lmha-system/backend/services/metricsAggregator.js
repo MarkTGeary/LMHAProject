@@ -8,6 +8,7 @@ async function aggregateMetrics(location, startDate, endDate) {
   const [bookingsResult, standaloneResult] = await Promise.all([
     db.execute({
       sql: `SELECT b.*,
+                   i.id as intake_id,
                    i.referral_source, i.reasons_for_attending,
                    i.support_needs, i.onward_referrals,
                    i.limitations_detail as intake_limitations_detail
@@ -29,11 +30,14 @@ async function aggregateMetrics(location, startDate, endDate) {
   const attended    = bookings.filter(b => b.outcome === 'Attended');
   const dna         = bookings.filter(b => b.outcome === 'Did Not Attend');
   const serviceBookings = bookings.filter(b => b.outcome !== 'Did Not Attend');
-  const phoneCalls  = serviceBookings.filter(b => b.interaction_type === 'Phone Call');
+  const phoneCalls  = attended.filter(b => b.interaction_type === 'Phone Call');
+  const peopleBookings = serviceBookings.filter(b =>
+    b.service_user_id && (b.outcome === 'Attended' || b.intake_id)
+  );
 
-  // Demographics are attendee metrics. Did-not-attend records are counted
-  // separately but must not inflate people/age/gender totals.
-  const userIds = [...new Set(attended.map(b => b.service_user_id).filter(Boolean))];
+  // Demographics come from completed intake/person records. Did-not-attend
+  // records are counted separately but must not inflate people/age/gender totals.
+  const userIds = [...new Set(peopleBookings.map(b => b.service_user_id).filter(Boolean))];
   let users = [];
   if (userIds.length) {
     const usersResult = await db.execute({
@@ -90,8 +94,8 @@ async function aggregateMetrics(location, startDate, endDate) {
     total_male:             users.filter(u => u.gender === 'Male').length,
     total_female:           users.filter(u => u.gender === 'Female').length,
     total_other_gender:     users.filter(u => u.gender === 'Prefer not to say').length,
-    total_new:              attended.filter(b => b.new_or_repeat === 'New').length,
-    total_repeat:           attended.filter(b => b.new_or_repeat === 'Repeat').length,
+    total_new:              peopleBookings.filter(b => b.new_or_repeat === 'New').length,
+    total_repeat:           peopleBookings.filter(b => b.new_or_repeat === 'Repeat').length,
     age_18_24:  users.filter(u => u.age_group === '18-24').length,
     age_25_34:  users.filter(u => u.age_group === '25-34').length,
     age_35_44:  users.filter(u => u.age_group === '35-44').length,
@@ -113,7 +117,7 @@ async function aggregateMetrics(location, startDate, endDate) {
     crisis_support:          serviceBookings.filter(b => hasSupport(b, 'C')).length,
     other_supports: serviceBookings.filter(b =>
       hasSupport(b, 'O') ||
-      ['Phone Call', 'Email', 'Text'].includes(b.interaction_type)
+      (b.outcome === 'Attended' && ['Phone Call', 'Email', 'Text'].includes(b.interaction_type))
     ).length,
   };
   s2.total = s2.information_seeking + s2.social_support_signposting +
