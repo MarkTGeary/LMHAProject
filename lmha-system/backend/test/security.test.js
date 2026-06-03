@@ -427,6 +427,91 @@ test('solace intake view returns saved person details and intake edits update ag
   assert.equal(metrics.section1.age_25_34, 1);
 });
 
+test('repeat intake updates existing service user demographics for review and metrics', async () => {
+  const date = '2035-03-06';
+  const originalUser = await request(app)
+    .post('/api/service-users')
+    .set('Cookie', staff.cookie)
+    .set('X-CSRF-Token', staff.csrfToken)
+    .set('X-Location', SOLACE_LOCATION_HEADER)
+    .send({
+      full_name: 'Tony Repeat',
+      first_visit_date: '2034-12-01',
+    })
+    .expect(201);
+
+  const booking = await request(app)
+    .post('/api/bookings')
+    .set('Cookie', staff.cookie)
+    .set('X-CSRF-Token', staff.csrfToken)
+    .set('X-Location', SOLACE_LOCATION_HEADER)
+    .send({
+      location: 'Solace Café',
+      date,
+      time_booked: '21:00',
+      interaction_type: 'Peer Support Booking',
+      service_user_id: originalUser.body.id,
+      new_or_repeat: 'Repeat',
+    })
+    .expect(201);
+
+  await request(app)
+    .post('/api/intake-forms')
+    .set('Cookie', staff.cookie)
+    .set('X-CSRF-Token', staff.csrfToken)
+    .set('X-Location', SOLACE_LOCATION_HEADER)
+    .send({
+      booking_id: booking.body.id,
+      service_user_id: originalUser.body.id,
+      existing_user_id: originalUser.body.id,
+      is_repeat: true,
+      full_name: 'Tony Repeat',
+      age_group: '35-44',
+      gender: 'Male',
+      living_alone: 'No',
+      english_speaking: 'Yes',
+      privacy_acknowledged: true,
+      safety_agreement_acknowledged: true,
+      confidentiality_limits_explained: true,
+      signed_date: date,
+      reasons_for_attending: ['Looking for Peer support'],
+      support_needs: ['peer_recovery'],
+    })
+    .expect(201);
+
+  const user = await request(app)
+    .get(`/api/service-users/${originalUser.body.id}`)
+    .set('Cookie', staff.cookie)
+    .set('X-Location', SOLACE_LOCATION_HEADER)
+    .expect(200);
+
+  assert.equal(user.body.age_group, '35-44');
+  assert.equal(user.body.gender, 'Male');
+
+  const intake = await request(app)
+    .get(`/api/intake-forms/booking/${booking.body.id}`)
+    .set('Cookie', staff.cookie)
+    .set('X-Location', SOLACE_LOCATION_HEADER)
+    .expect(200);
+
+  assert.equal(intake.body.age_group, '35-44');
+  assert.equal(intake.body.gender, 'Male');
+
+  await request(app)
+    .patch(`/api/bookings/${booking.body.id}`)
+    .set('Cookie', staff.cookie)
+    .set('X-CSRF-Token', staff.csrfToken)
+    .set('X-Location', SOLACE_LOCATION_HEADER)
+    .send({ outcome: 'Attended' })
+    .expect(200);
+
+  const metrics = await aggregateMetrics('Solace Café', date, date);
+  assert.equal(metrics.section1.total_repeat, 1);
+  assert.equal(metrics.section1.total_people, 1);
+  assert.equal(metrics.section1.total_male, 1);
+  assert.equal(metrics.section1.age_35_44, 1);
+});
+
 test('pending phone bookings count as bookings received but not support calls', async () => {
   const date = '2035-03-05';
   const booking = await request(app)

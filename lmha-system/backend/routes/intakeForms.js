@@ -150,6 +150,25 @@ function normaliseServiceUserFields(body) {
   };
 }
 
+async function updateServiceUserFields(userId, serviceUserFields) {
+  const sets = [];
+  const args = [];
+  for (const [field, value] of Object.entries(serviceUserFields)) {
+    if (value !== undefined) {
+      if (field === 'full_name' && value === null) continue;
+      sets.push(`${field} = ?`);
+      args.push(value);
+    }
+  }
+  if (!sets.length) return;
+
+  args.push(userId);
+  await db.execute({
+    sql: `UPDATE service_users SET ${sets.join(', ')} WHERE id = ?`,
+    args,
+  });
+}
+
 // GET /api/intake-forms/booking/:bookingId
 router.get('/booking/:bookingId', async (req, res, next) => {
   try {
@@ -222,6 +241,7 @@ router.post('/', async (req, res, next) => {
     if (is_repeat && existingUserId) {
       userId = existingUserId;
       await db.execute({ sql: 'UPDATE service_users SET repeat_user = 1 WHERE id = ?', args: [existingUserId] });
+      await updateServiceUserFields(existingUserId, serviceUserFields);
       await db.execute({
         sql: 'UPDATE bookings SET service_user_id = ?, new_or_repeat = ? WHERE id = ?',
         args: [existingUserId, 'Repeat', bookingId],
@@ -254,21 +274,7 @@ router.post('/', async (req, res, next) => {
         args: [userId, 'New', bookingId],
       });
     } else {
-      const sets = [];
-      const args = [];
-      for (const [field, value] of Object.entries(serviceUserFields)) {
-        if (value !== undefined) {
-          sets.push(`${field} = ?`);
-          args.push(value);
-        }
-      }
-      if (sets.length) {
-        args.push(userId);
-        await db.execute({
-          sql: `UPDATE service_users SET ${sets.join(', ')} WHERE id = ?`,
-          args,
-        });
-      }
+      await updateServiceUserFields(userId, serviceUserFields);
     }
 
     if (ed_diversion !== undefined) {
