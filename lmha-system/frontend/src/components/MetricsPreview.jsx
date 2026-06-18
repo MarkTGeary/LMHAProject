@@ -145,6 +145,8 @@ export default function MetricsPreview({ metrics }) {
             <Row label="Looked for appointment after midnight" value={lim?.lim_time_late} />
           </>
         )}
+        <Row label="Could not offer an appointment within the week" value={lim?.lim_no_appointment_week} />
+        <Row label="Forced to close due to short staff" value={lim?.lim_closed_short_staff} />
         <Row label="Calls out of hours" value={lim?.lim_calls_out_hours} />
         <Row label="Text out of hours" value={lim?.lim_text_out_hours} />
         <Row label="TOTAL" value={lim?.total} total />

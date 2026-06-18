@@ -79,7 +79,7 @@ const LIMITATIONS = [
   'calls_out_of_hours',
   'text_out_of_hours',
 ];
-const AGE_GROUPS = ['18-24', '25-34', '35-44', '45-54', '55-64', '65+'];
+const AGE_GROUPS = ['18-24', '25-34', '35-44', '45-54', '55-64', '65+', 'Unknown'];
 const GENDERS = ['Male', 'Female', 'Prefer not to say'];
 const YES_NO = ['Yes', 'No'];
 
