@@ -38,17 +38,17 @@ export default function MetricsPreview({ metrics }) {
 
       <Section title="Section 1 — General Service Information">
         <Row label="Total bookings received" value={s1?.total_bookings_received} info />
-        <Row label="Total attendees through bookings" value={s1?.total_attendees_through_bookings} info />
-        <Row label="Walk-in crisis support" value={s1?.total_walk_in_crisis} info />
-        <Row label="Support calls" value={s1?.total_support_calls} info />
-        <Row label="Walk-in social support" value={s1?.total_walk_in_social} info />
+        <Row label="Total attendees through bookings" value={s1?.total_attendees_through_bookings} />
+        <Row label="Walk-in crisis support" value={s1?.total_walk_in_crisis} />
+        <Row label="Support calls" value={s1?.total_support_calls} />
+        <Row label="Walk-in social support" value={s1?.total_walk_in_social} />
         <Row label="Did not attend" value={s1?.total_dna} info />
         <Row label="Family/Carer attendees" value={s1?.total_carer_attendees} info />
         <Row label="Male" value={s1?.total_male} info />
         <Row label="Female" value={s1?.total_female} info />
         <Row label="Other / Prefer not to say" value={s1?.total_other_gender} info />
-        <Row label="New attendees" value={s1?.total_new} />
-        <Row label="Repeat attendees" value={s1?.total_repeat} />
+        <Row label="New attendees" value={s1?.total_new} info />
+        <Row label="Repeat attendees" value={s1?.total_repeat} info />
         <Row label="Age 18–24" value={s1?.age_18_24} info />
         <Row label="Age 25–34" value={s1?.age_25_34} info />
         <Row label="Age 35–44" value={s1?.age_35_44} info />
