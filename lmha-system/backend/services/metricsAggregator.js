@@ -80,6 +80,7 @@ async function aggregateMetrics(location, startDate, endDate) {
     age_45_54:  users.filter(u => u.age_group === '45-54').length,
     age_55_64:  users.filter(u => u.age_group === '55-64').length,
     age_65_plus: users.filter(u => u.age_group === '65+').length,
+    age_unknown: users.filter(u => u.age_group === 'Unknown').length,
   };
   s1.total_people = s1.total_new + s1.total_repeat;
 
@@ -169,6 +170,8 @@ async function aggregateMetrics(location, startDate, endDate) {
         lim_day3:            0,
         lim_time_early:      countLimitation('before_11am'),
         lim_time_late:       countLimitation('after_5pm'),
+        lim_no_appointment_week: countLimitation('no_appointment_in_week'),
+        lim_closed_short_staff:  countLimitation('closed_short_staff'),
         lim_calls_out_hours: countLimitation('calls_out_of_hours'),
         lim_text_out_hours:  countLimitation('text_out_of_hours'),
       }
@@ -178,11 +181,14 @@ async function aggregateMetrics(location, startDate, endDate) {
         lim_day3:            countLimitation('wednesday'),
         lim_time_early:      countLimitation('before_6pm'),
         lim_time_late:       countLimitation('after_midnight'),
+        lim_no_appointment_week: countLimitation('no_appointment_in_week'),
+        lim_closed_short_staff:  countLimitation('closed_short_staff'),
         lim_calls_out_hours: countLimitation('calls_out_of_hours'),
         lim_text_out_hours:  countLimitation('text_out_of_hours'),
       };
   limitations.total = limitations.lim_day1 + limitations.lim_day2 + limitations.lim_day3 +
                       limitations.lim_time_early + limitations.lim_time_late +
+                      limitations.lim_no_appointment_week + limitations.lim_closed_short_staff +
                       limitations.lim_calls_out_hours + limitations.lim_text_out_hours;
   limitations.lim_indv_not_facilitated = bookings.filter(b =>
     parseJson(b.limitations_detail).length > 0

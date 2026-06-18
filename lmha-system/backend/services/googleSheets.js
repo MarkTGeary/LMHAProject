@@ -23,34 +23,35 @@ const SPREADSHEET_IDS = {
 //  Row 13  Total number of attendees Male
 //  ...
 //  Row 23  Age 65+
-//  Row 24  (blank)
-//  Row 25  TOTAL People
-//  Row 26  "2. Support Requirements" header
-//  Row 27  Peer Support & Connection / Information Seeking only
+//  Row 24  Age Unknown   ← inserted; all rows below shifted down by 1
+//  Row 25  (blank)
+//  Row 26  TOTAL People
+//  Row 27  "2. Support Requirements" header
+//  Row 28  Peer Support & Connection / Information Seeking only
 //  ...
-//  Row 32  TOTAL (Section 2)
-//  Row 33  "3. Support requirements by type" header
-//  Row 34  Needs / Statutory MH info
+//  Row 33  TOTAL (Section 2)
+//  Row 34  "3. Support requirements by type" header
+//  Row 35  Needs / Statutory MH info
 //  ...
-//  Row 43  TOTAL (Section 3)
-//  Row 44  "4. Referral Activity" header
-//  Row 45  ED Diversion / Self-referrals
+//  Row 44  TOTAL (Section 3)
+//  Row 45  "4. Referral Activity" header
+//  Row 46  ED Diversion / Self-referrals
 //  ...
-//  Row 56  TOTAL (Section 4)
-//  Row 57  "5. Advocacy/Follow up" header
-//  Row 58  C&V / Counselling Services
+//  Row 57  TOTAL (Section 4)
+//  Row 58  "5. Advocacy/Follow up" header
+//  Row 59  C&V / Counselling Services
 //  ...
-//  Row 64  (blank)
-//  Row 65  TOTAL C&V
-//  Row 66  Statutory / HSE Mental Health
+//  Row 65  (blank)
+//  Row 66  TOTAL C&V
+//  Row 67  Statutory / HSE Mental Health
 //  ...
-//  Row 76  TOTAL Statutory
-//  Row 77  (blank)
-//  Rows 78-83: Miscellaneous/Feedback (not tracked in system)
-//  Row 84  (blank)
-//  Row 85  Limitations / INDV not facilitated
+//  Row 77  TOTAL Statutory
+//  Row 78  (blank)
+//  Rows 79-84: Miscellaneous/Feedback (not tracked in system)
+//  Row 85  (blank)
+//  Row 86  Limitations / INDV not facilitated
 //  ...
-//  Row 93  Total (Limitations)
+//  Row 96  Total (Limitations)
 // ─────────────────────────────────────────────────────────────────
 const ROW_MAP = {
   // ── Section 1: General Service Information ──────────────────────
@@ -73,93 +74,96 @@ const ROW_MAP = {
   age_45_54:                        21,
   age_55_64:                        22,
   age_65_plus:                      23,
-  // row 24: blank
-  total_people:                     25,
+  age_unknown:                      24,
+  // row 25: blank
+  total_people:                     26,
 
-  // row 26: "2. Support Requirements" header
+  // row 27: "2. Support Requirements" header
   // ── Section 2: Support Requirements ─────────────────────────────
-  information_seeking:              27,
-  social_support_signposting:       28,
-  one_to_one_peer_support:          29,
-  crisis_support:                   30,
-  other_supports:                   31,
-  s2_total:                         32,
+  information_seeking:              28,
+  social_support_signposting:       29,
+  one_to_one_peer_support:          30,
+  crisis_support:                   31,
+  other_supports:                   32,
+  s2_total:                         33,
 
-  // row 33: "3. Support requirements by type" header
+  // row 34: "3. Support requirements by type" header
   // ── Section 3: Support Requirements by Type ──────────────────────
-  info_statutory_mh_hse:            34,
-  info_non_statutory_mh:            35,
-  info_wider_community:             36,
-  peer_support_coping:              37,
-  peer_support_recovery:            38,
-  crisis_deescalation:              39,
-  crisis_onward_ae:                 40,
-  crisis_guards_community:          41,
-  social_support:                   42,
-  s3_total:                         43,
+  info_statutory_mh_hse:            35,
+  info_non_statutory_mh:            36,
+  info_wider_community:             37,
+  peer_support_coping:              38,
+  peer_support_recovery:            39,
+  crisis_deescalation:              40,
+  crisis_onward_ae:                 41,
+  crisis_guards_community:          42,
+  social_support:                   43,
+  s3_total:                         44,
 
-  // row 44: "4. Referral Activity" header
+  // row 45: "4. Referral Activity" header
   // ── Section 4: Referral Activity ─────────────────────────────────
-  self_referral:                    45,
-  community_ngo:                    46,
-  hse_mh_services:                  47,
-  hse_health_services:              48,
-  gp:                               49,
-  other_referral:                   50,
-  cast_referral:                    51,
-  lsw_referral:                     52,
-  ltsp_referral:                    53,
-  probation_referral:               54,
-  ed_diversion_yes:                 55,
-  s4_total:                         56,
+  self_referral:                    46,
+  community_ngo:                    47,
+  hse_mh_services:                  48,
+  hse_health_services:              49,
+  gp:                               50,
+  other_referral:                   51,
+  cast_referral:                    52,
+  lsw_referral:                     53,
+  ltsp_referral:                    54,
+  probation_referral:               55,
+  ed_diversion_yes:                 56,
+  s4_total:                         57,
 
-  // row 57: "5. Advocacy/Follow up" header
+  // row 58: "5. Advocacy/Follow up" header
   // ── Section 5 C&V ────────────────────────────────────────────────
-  cv_counselling:                   58,
-  cv_housing:                       59,
-  cv_finance:                       60,
-  cv_mh_groups:                     61,
-  cv_addiction_groups:              62,
-  cv_family:                        63,
-  // row 64: blank
-  s5_cv_total:                      65,
+  cv_counselling:                   59,
+  cv_housing:                       60,
+  cv_finance:                       61,
+  cv_mh_groups:                     62,
+  cv_addiction_groups:              63,
+  cv_family:                        64,
+  // row 65: blank
+  s5_cv_total:                      66,
 
   // ── Section 5 Statutory ───────────────────────────────────────────
-  statutory_hse_mh:                 66,
-  statutory_hse_primary_care:       67,
-  statutory_hse_disability:         68,
-  statutory_hse_older_persons:      69,
-  statutory_hse_crt:                70,
-  statutory_tusla:                  71,
-  statutory_mabs:                   72,
-  statutory_dept_social:            73,
-  statutory_citizens_info:          74,
-  statutory_ags:                    75,
-  s5_statutory_total:               76,
+  statutory_hse_mh:                 67,
+  statutory_hse_primary_care:       68,
+  statutory_hse_disability:         69,
+  statutory_hse_older_persons:      70,
+  statutory_hse_crt:                71,
+  statutory_tusla:                  72,
+  statutory_mabs:                   73,
+  statutory_dept_social:            74,
+  statutory_citizens_info:          75,
+  statutory_ags:                    76,
+  s5_statutory_total:               77,
 
-  // row 77: blank
-  // row 78: "Miscellaneous / Feedback from service users" header (no data written)
+  // row 78: blank
+  // row 79: "Miscellaneous / Feedback from service users" header (no data written)
   // ── Miscellaneous: Feedback from Service Users ────────────────────
-  misc_thankyou_letters:            79,
-  misc_verbal_feedback:             80,
-  misc_testimonials:                81,
-  misc_vox_pop:                     82,
-  misc_total:                       83,
-  // row 84: blank
+  misc_thankyou_letters:            80,
+  misc_verbal_feedback:             81,
+  misc_testimonials:                82,
+  misc_vox_pop:                     83,
+  misc_total:                       84,
+  // row 85: blank
 
   // ── Limitations (positional — same rows for both locations) ───────
   // lim_day1/2/3  = Mon/Tue/Wed for Solace Café, Sat/Sun/(none) for LMHA
   // lim_time_early = before 6pm for Solace, before 11am for LMHA
   // lim_time_late  = after midnight for Solace, after 5pm for LMHA
-  lim_indv_not_facilitated:         85,
-  lim_day1:                         86,
-  lim_day2:                         87,
-  lim_day3:                         88,
-  lim_time_early:                   89,
-  lim_time_late:                    90,
-  lim_calls_out_hours:              91,
-  lim_text_out_hours:               92,
-  lim_total:                        93,
+  lim_indv_not_facilitated:         86,
+  lim_day1:                         87,
+  lim_day2:                         88,
+  lim_day3:                         89,
+  lim_time_early:                   90,
+  lim_time_late:                    91,
+  lim_no_appointment_week:          92,
+  lim_closed_short_staff:           93,
+  lim_calls_out_hours:              94,
+  lim_text_out_hours:               95,
+  lim_total:                        96,
 };
 
 function getAuth() {
@@ -370,6 +374,7 @@ async function readMetrics(location, startDate, endDate) {
     age_45_54:                        flat.age_45_54,
     age_55_64:                        flat.age_55_64,
     age_65_plus:                      flat.age_65_plus,
+    age_unknown:                      flat.age_unknown,
     total_people:                     flat.total_people,
   };
 
@@ -448,6 +453,8 @@ async function readMetrics(location, startDate, endDate) {
     lim_day3:                 flat.lim_day3,
     lim_time_early:           flat.lim_time_early,
     lim_time_late:            flat.lim_time_late,
+    lim_no_appointment_week:  flat.lim_no_appointment_week,
+    lim_closed_short_staff:   flat.lim_closed_short_staff,
     lim_calls_out_hours:      flat.lim_calls_out_hours,
     lim_text_out_hours:       flat.lim_text_out_hours,
     total:                    flat.lim_total,

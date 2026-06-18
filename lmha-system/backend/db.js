@@ -25,7 +25,7 @@ async function initAndMigrate() {
       full_name TEXT NOT NULL,
       phone TEXT,
       email TEXT,
-      age_group TEXT CHECK(age_group IN ('18-24','25-34','35-44','45-54','55-64','65+')),
+      age_group TEXT CHECK(age_group IN ('18-24','25-34','35-44','45-54','55-64','65+','Unknown')),
       gender TEXT CHECK(gender IN ('Male','Female','Prefer not to say')),
       living_alone TEXT CHECK(living_alone IN ('Yes','No')),
       english_speaking TEXT CHECK(english_speaking IN ('Yes','No')),
@@ -178,6 +178,7 @@ async function initAndMigrate() {
   }
 
   await migrateAllowedEmailRoles();
+  await migrateAgeGroupUnknown();
 
   const lockTablesResult = await _client.execute(
     "SELECT name FROM sqlite_master WHERE type='table' AND name='booking_slot_locks'"
@@ -225,6 +226,52 @@ async function migrateAllowedEmailRoles() {
       args: [rootAdmin],
     });
   }
+}
+
+// ── Migration: allow 'Unknown' in service_users.age_group ───────────
+// SQLite can't alter a CHECK constraint in place, so we rebuild the table
+// when the existing constraint predates the 'Unknown' age option.
+async function migrateAgeGroupUnknown() {
+  const schema = await _client.execute(
+    "SELECT sql FROM sqlite_master WHERE type='table' AND name='service_users'"
+  );
+  const sql = schema.rows[0] && schema.rows[0].sql;
+  if (!sql || sql.includes("'Unknown'")) return; // fresh DB or already migrated
+
+  console.log("[DB] Running migration: adding 'Unknown' to service_users.age_group...");
+  // foreign_keys must be toggled outside of a transaction
+  await _client.execute('PRAGMA foreign_keys = OFF');
+  await _client.executeMultiple(`
+    BEGIN;
+    CREATE TABLE service_users_new (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      full_name TEXT NOT NULL,
+      phone TEXT,
+      email TEXT,
+      age_group TEXT CHECK(age_group IN ('18-24','25-34','35-44','45-54','55-64','65+','Unknown')),
+      gender TEXT CHECK(gender IN ('Male','Female','Prefer not to say')),
+      living_alone TEXT CHECK(living_alone IN ('Yes','No')),
+      english_speaking TEXT CHECK(english_speaking IN ('Yes','No')),
+      translator_required TEXT CHECK(translator_required IN ('Yes','No')),
+      translator_language TEXT,
+      address TEXT,
+      emergency_contact_name TEXT,
+      emergency_contact_relationship TEXT,
+      emergency_contact_phone TEXT,
+      gp_name TEXT,
+      gp_phone TEXT,
+      repeat_user INTEGER DEFAULT 0,
+      first_visit_date TEXT,
+      created_at TEXT DEFAULT (datetime('now'))
+    );
+    INSERT INTO service_users_new SELECT * FROM service_users;
+    DROP TABLE service_users;
+    ALTER TABLE service_users_new RENAME TO service_users;
+    CREATE INDEX IF NOT EXISTS idx_service_users_name ON service_users(full_name);
+    COMMIT;
+  `);
+  await _client.execute('PRAGMA foreign_keys = ON');
+  console.log("[DB] Migration complete: service_users.age_group now allows 'Unknown'.");
 }
 
 async function auditAndBackfillBookingLocks() {

@@ -50,6 +50,7 @@ export default function MetricsPreview({ metrics }) {
         <Row label="Age 45–54" value={s1?.age_45_54} />
         <Row label="Age 55–64" value={s1?.age_55_64} />
         <Row label="Age 65+" value={s1?.age_65_plus} />
+        <Row label="Age Unknown" value={s1?.age_unknown} />
         <Row label="TOTAL People" value={s1?.total_people} total />
       </Section>
 
@@ -140,6 +141,8 @@ export default function MetricsPreview({ metrics }) {
             <Row label="Looked for appointment after midnight" value={lim?.lim_time_late} />
           </>
         )}
+        <Row label="Could not offer an appointment within the week" value={lim?.lim_no_appointment_week} />
+        <Row label="Forced to close due to short staff" value={lim?.lim_closed_short_staff} />
         <Row label="Calls out of hours" value={lim?.lim_calls_out_hours} />
         <Row label="Text out of hours" value={lim?.lim_text_out_hours} />
         <Row label="TOTAL" value={lim?.total} total />
