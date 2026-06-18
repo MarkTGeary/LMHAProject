@@ -107,18 +107,6 @@ export default function OutcomeForm() {
     if (!form.outcome || form.outcome === 'Pending') {
       setError('Set the outcome before closing'); return
     }
-<<<<<<< HEAD
-=======
-    if (!hasIntake) {
-      setError('Cannot close: intake form must be completed first'); return
-    }
-    if (form.type_of_support.length === 0) {
-      setError('Cannot close: at least one type of support must be selected'); return
-    }
-    if (form.outcome === 'Attended' && !form.service_event_type) {
-      setError('Cannot close: select how this person was supported (service event type)'); return
-    }
->>>>>>> bad3fba (Changing flow of support type reporting)
     setError(''); setSaving(true)
 
     try {
@@ -310,15 +298,9 @@ export default function OutcomeForm() {
         {booking?.status === 'Active' && (
           <button
             onClick={closeCase}
-<<<<<<< HEAD
             disabled={saving || isLocked || !form.outcome || form.outcome === 'Pending'}
             className={`btn-lg w-full font-bold ${
               !isLocked && form.outcome && form.outcome !== 'Pending'
-=======
-            disabled={saving || isLocked || !hasIntake || !form.outcome || form.outcome === 'Pending' || form.type_of_support.length === 0 || (form.outcome === 'Attended' && !form.service_event_type)}
-            className={`btn-lg w-full font-bold ${
-              !isLocked && hasIntake && form.outcome && form.outcome !== 'Pending' && form.type_of_support.length > 0 && (form.outcome !== 'Attended' || form.service_event_type)
->>>>>>> bad3fba (Changing flow of support type reporting)
                 ? 'btn-success'
                 : 'btn-secondary opacity-50 cursor-not-allowed'
             }`}
@@ -330,16 +312,7 @@ export default function OutcomeForm() {
         <div className="card bg-gray-50 text-sm">
           <div className="font-semibold text-gray-700 mb-2">Requirements to close:</div>
           {[
-<<<<<<< HEAD
             { label: 'Outcome selected (Attended or Did Not Attend)', met: !!form.outcome && form.outcome !== 'Pending' },
-=======
-            { label: 'Intake form completed', met: hasIntake },
-            { label: 'Outcome selected', met: !!form.outcome && form.outcome !== 'Pending' },
-            { label: 'Type of support selected', met: form.type_of_support.length > 0 },
-            ...(form.outcome === 'Attended'
-              ? [{ label: 'Service event type selected', met: !!form.service_event_type }]
-              : []),
->>>>>>> bad3fba (Changing flow of support type reporting)
           ].map(({ label, met }) => (
             <div key={label} className={`flex items-center gap-2 py-1 ${met ? 'text-green-700' : 'text-red-600'}`}>
               <span>{met ? '✓' : '✗'}</span> {label}

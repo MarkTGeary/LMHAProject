@@ -330,7 +330,7 @@ test('metrics exclude did-not-attend records from people and support totals', as
     .set('Cookie', staff.cookie)
     .set('X-CSRF-Token', staff.csrfToken)
     .set('X-Location', 'LMHA')
-    .send({ outcome: 'Attended' })
+    .send({ outcome: 'Attended', service_event_type: 'Walk-in social' })
     .expect(200);
 
   await request(app)
@@ -365,6 +365,14 @@ test('solace intake view returns saved person details and intake edits update ag
       new_or_repeat: 'New',
     })
     .expect(201);
+
+  await request(app)
+    .patch(`/api/bookings/${booking.body.id}`)
+    .set('Cookie', staff.cookie)
+    .set('X-CSRF-Token', staff.csrfToken)
+    .set('X-Location', SOLACE_LOCATION_HEADER)
+    .send({ outcome: 'Attended', service_event_type: 'Attended through booking' })
+    .expect(200);
 
   const intakePayload = (ageGroup) => ({
     booking_id: booking.body.id,
@@ -502,7 +510,7 @@ test('repeat intake updates existing service user demographics for review and me
     .set('Cookie', staff.cookie)
     .set('X-CSRF-Token', staff.csrfToken)
     .set('X-Location', SOLACE_LOCATION_HEADER)
-    .send({ outcome: 'Attended' })
+    .send({ outcome: 'Attended', service_event_type: 'Attended through booking' })
     .expect(200);
 
   const metrics = await aggregateMetrics('Solace Café', date, date);
@@ -539,7 +547,7 @@ test('pending phone bookings count as bookings received but not support calls', 
     .set('Cookie', staff.cookie)
     .set('X-CSRF-Token', staff.csrfToken)
     .set('X-Location', SOLACE_LOCATION_HEADER)
-    .send({ outcome: 'Attended' })
+    .send({ outcome: 'Attended', service_event_type: 'Support call' })
     .expect(200);
 
   metrics = await aggregateMetrics('Solace Café', date, date);

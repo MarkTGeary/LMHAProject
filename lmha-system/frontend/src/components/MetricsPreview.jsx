@@ -55,6 +55,7 @@ export default function MetricsPreview({ metrics }) {
         <Row label="Age 45–54" value={s1?.age_45_54} info />
         <Row label="Age 55–64" value={s1?.age_55_64} info />
         <Row label="Age 65+" value={s1?.age_65_plus} info />
+        <Row label="Age Unknown" value={s1?.age_unknown} info />
         <Row label="TOTAL People" value={s1?.total_people} total />
       </Section>
 
