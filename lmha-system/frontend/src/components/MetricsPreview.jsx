@@ -7,10 +7,12 @@ export default function MetricsPreview({ metrics }) {
     dateRange, location,
   } = metrics
 
-  // Contributing data rows are tinted green; section totals are tinted yellow.
-  const Row = ({ label, value, total }) => (
+  // Rows whose values sum to the section TOTAL are tinted green; section
+  // totals are tinted yellow. Informational rows (collected but not summed
+  // into the total, e.g. age bands) are left untinted via `info`.
+  const Row = ({ label, value, total, info }) => (
     <div className={`flex justify-between items-center py-2 px-2 rounded border-b border-gray-100 last:border-0 ${
-      total ? 'font-bold bg-yellow-100 border-yellow-200' : 'bg-green-50'
+      total ? 'font-bold bg-yellow-100 border-yellow-200' : info ? 'bg-white' : 'bg-green-50'
     }`}>
       <span className={`text-sm ${total ? 'text-gray-900' : 'text-gray-700'}`}>{label}</span>
       <span className="font-bold text-gray-900 text-lg min-w-[40px] text-right">{value ?? 0}</span>
@@ -35,24 +37,24 @@ export default function MetricsPreview({ metrics }) {
       </div>
 
       <Section title="Section 1 — General Service Information">
-        <Row label="Total bookings received" value={s1?.total_bookings_received} />
-        <Row label="Total attendees through bookings" value={s1?.total_attendees_through_bookings} />
-        <Row label="Walk-in crisis support" value={s1?.total_walk_in_crisis} />
-        <Row label="Support calls" value={s1?.total_support_calls} />
-        <Row label="Walk-in social support" value={s1?.total_walk_in_social} />
-        <Row label="Did not attend" value={s1?.total_dna} />
-        <Row label="Family/Carer attendees" value={s1?.total_carer_attendees} />
-        <Row label="Male" value={s1?.total_male} />
-        <Row label="Female" value={s1?.total_female} />
-        <Row label="Other / Prefer not to say" value={s1?.total_other_gender} />
+        <Row label="Total bookings received" value={s1?.total_bookings_received} info />
+        <Row label="Total attendees through bookings" value={s1?.total_attendees_through_bookings} info />
+        <Row label="Walk-in crisis support" value={s1?.total_walk_in_crisis} info />
+        <Row label="Support calls" value={s1?.total_support_calls} info />
+        <Row label="Walk-in social support" value={s1?.total_walk_in_social} info />
+        <Row label="Did not attend" value={s1?.total_dna} info />
+        <Row label="Family/Carer attendees" value={s1?.total_carer_attendees} info />
+        <Row label="Male" value={s1?.total_male} info />
+        <Row label="Female" value={s1?.total_female} info />
+        <Row label="Other / Prefer not to say" value={s1?.total_other_gender} info />
         <Row label="New attendees" value={s1?.total_new} />
         <Row label="Repeat attendees" value={s1?.total_repeat} />
-        <Row label="Age 18–24" value={s1?.age_18_24} />
-        <Row label="Age 25–34" value={s1?.age_25_34} />
-        <Row label="Age 35–44" value={s1?.age_35_44} />
-        <Row label="Age 45–54" value={s1?.age_45_54} />
-        <Row label="Age 55–64" value={s1?.age_55_64} />
-        <Row label="Age 65+" value={s1?.age_65_plus} />
+        <Row label="Age 18–24" value={s1?.age_18_24} info />
+        <Row label="Age 25–34" value={s1?.age_25_34} info />
+        <Row label="Age 35–44" value={s1?.age_35_44} info />
+        <Row label="Age 45–54" value={s1?.age_45_54} info />
+        <Row label="Age 55–64" value={s1?.age_55_64} info />
+        <Row label="Age 65+" value={s1?.age_65_plus} info />
         <Row label="TOTAL People" value={s1?.total_people} total />
       </Section>
 
@@ -89,7 +91,7 @@ export default function MetricsPreview({ metrics }) {
         <Row label="LSW" value={s4?.lsw_referral} />
         <Row label="LTSP" value={s4?.ltsp_referral} />
         <Row label="Probation" value={s4?.probation_referral} />
-        <Row label="Would have attended A&E if service not available" value={s4?.ed_diversion_yes} />
+        <Row label="Would have attended A&E if service not available" value={s4?.ed_diversion_yes} info />
         <Row label="TOTAL" value={s4?.total} total />
       </Section>
 
@@ -126,7 +128,7 @@ export default function MetricsPreview({ metrics }) {
       </Section>
 
       <Section title="Limitations — Out-of-Hours Contact">
-        <Row label="Individuals who could not be facilitated" value={lim?.lim_indv_not_facilitated} />
+        <Row label="Individuals who could not be facilitated" value={lim?.lim_indv_not_facilitated} info />
         {location === 'LMHA' ? (
           <>
             <Row label="Looked for appointment on Saturday" value={lim?.lim_day1} />
