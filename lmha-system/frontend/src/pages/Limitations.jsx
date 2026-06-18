@@ -4,22 +4,26 @@ import Layout from '../components/Layout'
 import { apiFetch } from '../lib/api'
 
 const LIMITATIONS_LMHA = [
-  { key: 'saturday',           label: 'Looked for appointment on Saturday' },
-  { key: 'sunday',             label: 'Looked for appointment on Sunday' },
-  { key: 'before_11am',        label: 'Looked for appointment before 11am' },
-  { key: 'after_5pm',          label: 'Looked for appointment after 5pm' },
-  { key: 'calls_out_of_hours', label: 'Calls out of hours' },
-  { key: 'text_out_of_hours',  label: 'Text out of hours' },
+  { key: 'saturday',               label: 'Looked for appointment on Saturday' },
+  { key: 'sunday',                 label: 'Looked for appointment on Sunday' },
+  { key: 'before_11am',            label: 'Looked for appointment before 11am' },
+  { key: 'after_5pm',              label: 'Looked for appointment after 5pm' },
+  { key: 'no_appointment_in_week', label: 'Could not offer an appointment within the week' },
+  { key: 'closed_short_staff',     label: 'Forced to close due to short staff' },
+  { key: 'calls_out_of_hours',     label: 'Calls out of hours' },
+  { key: 'text_out_of_hours',      label: 'Text out of hours' },
 ]
 
 const LIMITATIONS_SOLACE = [
-  { key: 'monday',             label: 'Looked for appointment on Monday' },
-  { key: 'tuesday',            label: 'Looked for appointment on Tuesday' },
-  { key: 'wednesday',          label: 'Looked for appointment on Wednesday' },
-  { key: 'before_6pm',         label: 'Looked for appointment before 6pm' },
-  { key: 'after_midnight',     label: 'Looked for appointment after midnight' },
-  { key: 'calls_out_of_hours', label: 'Calls out of hours' },
-  { key: 'text_out_of_hours',  label: 'Text out of hours' },
+  { key: 'monday',                 label: 'Looked for appointment on Monday' },
+  { key: 'tuesday',                label: 'Looked for appointment on Tuesday' },
+  { key: 'wednesday',              label: 'Looked for appointment on Wednesday' },
+  { key: 'before_6pm',             label: 'Looked for appointment before 6pm' },
+  { key: 'after_midnight',         label: 'Looked for appointment after midnight' },
+  { key: 'no_appointment_in_week', label: 'Could not offer an appointment within the week' },
+  { key: 'closed_short_staff',     label: 'Forced to close due to short staff' },
+  { key: 'calls_out_of_hours',     label: 'Calls out of hours' },
+  { key: 'text_out_of_hours',      label: 'Text out of hours' },
 ]
 
 function todayStr() {
