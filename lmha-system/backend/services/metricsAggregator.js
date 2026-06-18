@@ -27,7 +27,6 @@ async function aggregateMetrics(location, startDate, endDate) {
   const bookings = bookingsResult.rows;
   const standaloneLimitations = standaloneResult.rows;
 
-  const attended    = bookings.filter(b => b.outcome === 'Attended');
   const dna         = bookings.filter(b => b.outcome === 'Did Not Attend');
   const serviceBookings = bookings.filter(b => b.outcome !== 'Did Not Attend');
 
@@ -92,16 +91,13 @@ async function aggregateMetrics(location, startDate, endDate) {
 
   // --- Section 1: General Service Information ---
   const s1 = {
-    // Bookings received excludes support calls (phone / information-seeking contacts).
-    total_bookings_received:          bookings.filter(b => !isSupportCall(b)).length,
-    // Attendees through bookings = attended in-person appointments only — not
-    // walk-ins, crises or support calls (those have their own buckets).
-    total_attendees_through_bookings: attended.filter(b => !isSupportCall(b) && !isWalkIn(b)).length,
-    total_walk_in_crisis: serviceBookings.filter(b =>
+    total_bookings_received:          bookings.length,
+    total_attendees_through_bookings: attended.length,
+    total_walk_in_crisis: bookings.filter(b =>
       b.interaction_type === 'Walk-In' && hasSupport(b, 'C')
     ).length,
-    total_support_calls:    supportCalls.length,
-    total_walk_in_social: serviceBookings.filter(b =>
+    total_support_calls:    phoneCalls.length,
+    total_walk_in_social: bookings.filter(b =>
       b.interaction_type === 'Walk-In' && hasSupport(b, 'SS')
     ).length,
     total_dna:              dna.length,
@@ -119,7 +115,9 @@ async function aggregateMetrics(location, startDate, endDate) {
     age_65_plus: users.filter(u => u.age_group === '65+').length,
     age_unknown: users.filter(u => u.age_group === 'Unknown').length,
   };
-  s1.total_people = s1.total_new + s1.total_repeat;
+  // Total People supported = sum of the four mutually-exclusive event types.
+  s1.total_people = s1.total_attendees_through_bookings + s1.total_support_calls +
+                    s1.total_walk_in_crisis + s1.total_walk_in_social;
 
   // --- Section 2: Support Requirements ---
   const s2 = {
