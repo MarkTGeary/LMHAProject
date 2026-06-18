@@ -10,8 +10,9 @@ const LOCATION_RULES = {
     days: [4, 5, 6, 0],
     startHour: 18,
     endHour: 24,
-    // 50-min slots on the hour; 20:00–20:30 and 22:30–23:00 are staff breaks
-    standardSlots: ['18:00', '19:00', '21:00', '23:00'],
+    // 50-min slots; 20:00–20:30 and 22:30–23:00 are staff breaks, so slots
+    // resume on the half hour after the first break (20:30, 21:30) then 23:00.
+    standardSlots: ['18:00', '19:00', '20:30', '21:30', '23:00'],
     breakPeriods: [
       { start: '20:00', end: '20:30' },
       { start: '22:30', end: '23:00' },
