@@ -12,6 +12,15 @@ const SUPPORT_TYPES = [
   { code: 'SP', label: 'Signposted' },
 ]
 
+// Mutually-exclusive Section-1 event type. Exactly one per attended booking;
+// the four feed the separate sheet rows and sum to Total People supported.
+const SERVICE_EVENT_TYPES = [
+  { value: 'Attended through booking', icon: '📅', label: 'Attended through booking' },
+  { value: 'Support call',             icon: '📞', label: 'Support call' },
+  { value: 'Walk-in crisis',           icon: '🚨', label: 'Walk-in crisis support' },
+  { value: 'Walk-in social',           icon: '🚶', label: 'Walk-in social support' },
+]
+
 export default function OutcomeForm() {
   const { id } = useParams()
   const navigate = useNavigate()
@@ -26,6 +35,7 @@ export default function OutcomeForm() {
 
   const [form, setForm] = useState({
     outcome: '',
+    service_event_type: '',
     time_in: '',
     time_out: '',
     type_of_support: [],
@@ -44,6 +54,7 @@ export default function OutcomeForm() {
         setIsLocked(new Date(b.date) < cutoff)
         setForm({
           outcome: b.outcome !== 'Pending' ? b.outcome : '',
+          service_event_type: b.service_event_type || '',
           time_in: b.time_in || '',
           time_out: b.time_out || '',
           type_of_support: (() => {
@@ -79,6 +90,7 @@ export default function OutcomeForm() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           outcome: form.outcome,
+          service_event_type: form.outcome === 'Attended' ? (form.service_event_type || null) : null,
           time_in: form.time_in || null,
           time_out: form.time_out || null,
           type_of_support: form.type_of_support,
@@ -105,6 +117,9 @@ export default function OutcomeForm() {
     if (form.type_of_support.length === 0) {
       setError('Cannot close: at least one type of support must be selected'); return
     }
+    if (form.outcome === 'Attended' && !form.service_event_type) {
+      setError('Cannot close: select how this person was supported (service event type)'); return
+    }
     setError(''); setSaving(true)
 
     try {
@@ -113,6 +128,7 @@ export default function OutcomeForm() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           outcome: form.outcome,
+          service_event_type: form.outcome === 'Attended' ? (form.service_event_type || null) : null,
           time_in: form.time_in || null,
           time_out: form.time_out || null,
           type_of_support: form.type_of_support,
@@ -202,6 +218,30 @@ export default function OutcomeForm() {
           </div>
         </div>
 
+        {/* Service event type — mutually exclusive, only for attended */}
+        {form.outcome === 'Attended' && (
+          <div className="card">
+            <h2 className="text-xl font-bold mb-1">How was this person supported? <span className="text-red-500">*</span></h2>
+            <p className="text-sm text-gray-500 mb-4">Pick one. These feed the four separate Section 1 metrics and add up to Total People supported.</p>
+            <div className="grid grid-cols-2 gap-3">
+              {SERVICE_EVENT_TYPES.map(({ value, icon, label }) => (
+                <button
+                  key={value}
+                  onClick={() => set('service_event_type', form.service_event_type === value ? '' : value)}
+                  className={`min-h-[64px] rounded-xl border-2 font-bold text-base transition-all active:scale-95 ${
+                    form.service_event_type === value
+                      ? 'bg-blue-600 border-blue-600 text-white'
+                      : 'bg-white border-gray-300 text-gray-700 hover:border-blue-300'
+                  }`}
+                >
+                  <div className="text-2xl">{icon}</div>
+                  <div className="text-xs font-semibold">{label}</div>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Times */}
         <div className="card">
           <h2 className="text-xl font-bold mb-4">Session Times</h2>
@@ -280,9 +320,9 @@ export default function OutcomeForm() {
         {booking?.status === 'Active' && (
           <button
             onClick={closeCase}
-            disabled={saving || isLocked || !hasIntake || !form.outcome || form.outcome === 'Pending' || form.type_of_support.length === 0}
+            disabled={saving || isLocked || !hasIntake || !form.outcome || form.outcome === 'Pending' || form.type_of_support.length === 0 || (form.outcome === 'Attended' && !form.service_event_type)}
             className={`btn-lg w-full font-bold ${
-              !isLocked && hasIntake && form.outcome && form.outcome !== 'Pending' && form.type_of_support.length > 0
+              !isLocked && hasIntake && form.outcome && form.outcome !== 'Pending' && form.type_of_support.length > 0 && (form.outcome !== 'Attended' || form.service_event_type)
                 ? 'btn-success'
                 : 'btn-secondary opacity-50 cursor-not-allowed'
             }`}
@@ -298,6 +338,9 @@ export default function OutcomeForm() {
             { label: 'Intake form completed', met: hasIntake },
             { label: 'Outcome selected', met: !!form.outcome && form.outcome !== 'Pending' },
             { label: 'Type of support selected', met: form.type_of_support.length > 0 },
+            ...(form.outcome === 'Attended'
+              ? [{ label: 'Service event type selected', met: !!form.service_event_type }]
+              : []),
           ].map(({ label, met }) => (
             <div key={label} className={`flex items-center gap-2 py-1 ${met ? 'text-green-700' : 'text-red-600'}`}>
               <span>{met ? '✓' : '✗'}</span> {label}

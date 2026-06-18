@@ -54,6 +54,9 @@ async function initAndMigrate() {
         'Phone Call','Walk-In','Crisis','Peer Support Booking','Email','Text','Scheduled','Off-the-cuff'
       )),
       new_or_repeat TEXT CHECK(new_or_repeat IN ('New','Repeat')),
+      service_event_type TEXT CHECK(service_event_type IN (
+        'Attended through booking','Support call','Walk-in crisis','Walk-in social'
+      )),
       referred_from TEXT,
       type_of_support TEXT,
       carer_attended INTEGER DEFAULT 0,
@@ -179,6 +182,7 @@ async function initAndMigrate() {
 
   await migrateAllowedEmailRoles();
   await migrateAgeGroupUnknown();
+  await migrateServiceEventType();
 
   const lockTablesResult = await _client.execute(
     "SELECT name FROM sqlite_master WHERE type='table' AND name='booking_slot_locks'"
@@ -272,6 +276,38 @@ async function migrateAgeGroupUnknown() {
   `);
   await _client.execute('PRAGMA foreign_keys = ON');
   console.log("[DB] Migration complete: service_users.age_group now allows 'Unknown'.");
+}
+
+// ── Migration: bookings.service_event_type ──────────────────────────
+// New mutually-exclusive Section-1 event type. Adds the column and does a
+// best-effort backfill from the old inferred logic so historical weeks still
+// aggregate. Precedence (each row gets exactly one): Support call (phone) →
+// Walk-in crisis → Walk-in social → Attended through booking.
+async function migrateServiceEventType() {
+  const columnsResult = await _client.execute('PRAGMA table_info(bookings)');
+  const columns = columnsResult.rows.map(row => row.name);
+  if (columns.includes('service_event_type')) return;
+
+  console.log('[DB] Running migration: adding bookings.service_event_type...');
+  await _client.execute(`
+    ALTER TABLE bookings ADD COLUMN service_event_type TEXT CHECK(service_event_type IN (
+      'Attended through booking','Support call','Walk-in crisis','Walk-in social'
+    ))
+  `);
+
+  await _client.executeMultiple(`
+    UPDATE bookings SET service_event_type = 'Support call'
+      WHERE service_event_type IS NULL AND interaction_type = 'Phone Call';
+    UPDATE bookings SET service_event_type = 'Walk-in crisis'
+      WHERE service_event_type IS NULL AND interaction_type = 'Walk-In'
+        AND type_of_support LIKE '%"C"%';
+    UPDATE bookings SET service_event_type = 'Walk-in social'
+      WHERE service_event_type IS NULL AND interaction_type = 'Walk-In'
+        AND type_of_support LIKE '%"SS"%';
+    UPDATE bookings SET service_event_type = 'Attended through booking'
+      WHERE service_event_type IS NULL AND outcome = 'Attended';
+  `);
+  console.log('[DB] Migration complete: bookings.service_event_type added and backfilled.');
 }
 
 async function auditAndBackfillBookingLocks() {

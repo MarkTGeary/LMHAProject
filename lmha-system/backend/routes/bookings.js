@@ -30,6 +30,7 @@ const NEW_REPEAT = ['New', 'Repeat'];
 const SUPPORT_TYPES = ['SS', 'PS', 'C', 'O', 'SP'];
 const OUTCOMES = ['Attended', 'Did Not Attend', 'Pending'];
 const STATUSES = ['Active', 'Closed', 'Cancelled'];
+const SERVICE_EVENT_TYPES = ['Attended through booking', 'Support call', 'Walk-in crisis', 'Walk-in social'];
 
 function localTodayStart() {
   const today = new Date();
@@ -346,6 +347,7 @@ router.patch('/:id', async (req, res, next) => {
     if (hasOwn(req.body, 'time_in')) values.time_in = req.body.time_in ? parseTimeString(req.body.time_in, 'time_in', { stepMinutes: 1 }) : null;
     if (hasOwn(req.body, 'time_out')) values.time_out = req.body.time_out ? parseTimeString(req.body.time_out, 'time_out', { stepMinutes: 1 }) : null;
     if (hasOwn(req.body, 'outcome')) values.outcome = enumValue(req.body.outcome, OUTCOMES, 'outcome', { required: false });
+    if (hasOwn(req.body, 'service_event_type')) values.service_event_type = enumValue(req.body.service_event_type, SERVICE_EVENT_TYPES, 'service_event_type', { required: false });
     if (hasOwn(req.body, 'status')) values.status = enumValue(req.body.status, STATUSES, 'status');
     if (hasOwn(req.body, 'ed_diversion')) values.ed_diversion = booleanInt(req.body.ed_diversion, 'ed_diversion', { nullable: true });
     if (hasOwn(req.body, 'service_user_id')) values.service_user_id = parseId(req.body.service_user_id, 'service_user_id', { required: false });
@@ -374,6 +376,10 @@ router.patch('/:id', async (req, res, next) => {
       const targetSupport = hasOwn(values, 'type_of_support') ? values.type_of_support : existing.type_of_support;
       if (!targetSupport || !JSON.parse(targetSupport).length) {
         throw conflict('Cannot close: type of support must be selected');
+      }
+      const targetEventType = hasOwn(values, 'service_event_type') ? values.service_event_type : existing.service_event_type;
+      if (targetOutcome === 'Attended' && !targetEventType) {
+        throw conflict('Cannot close: service event type must be selected for attended bookings');
       }
     }
 
