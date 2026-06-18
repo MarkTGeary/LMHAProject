@@ -4,6 +4,7 @@ import { useAuth } from '../App'
 import Layout from '../components/Layout'
 import RepeatUserSearch from '../components/RepeatUserSearch'
 import { apiFetch } from '../lib/api'
+import { isBookingLocked, LOCK_MESSAGE } from '../lib/constants'
 
 const REFERRAL_SOURCES = [
   'Self-referral',
@@ -63,27 +64,6 @@ const ONWARD_REFERRAL_OPTIONS = [
     { key: 'citizens_information', label: 'Citizens Information' },
     { key: 'ags',                  label: 'AGS (Gardaí)' },
   ]},
-]
-
-// Solace Café: Thu–Sun 18:00–00:00 — closed Mon/Tue/Wed, before 6pm, after midnight
-const LIMITATIONS_SOLACE = [
-  { key: 'monday',             label: 'Looked for appointment on Monday' },
-  { key: 'tuesday',            label: 'Looked for appointment on Tuesday' },
-  { key: 'wednesday',          label: 'Looked for appointment on Wednesday' },
-  { key: 'before_6pm',         label: 'Looked for appointment before 6pm' },
-  { key: 'after_midnight',     label: 'Looked for appointment after midnight' },
-  { key: 'calls_out_of_hours', label: 'Calls out of hours' },
-  { key: 'text_out_of_hours',  label: 'Text out of hours' },
-]
-
-// LMHA: Mon–Fri 11:00–17:00 — closed weekends, before 11am, after 5pm
-const LIMITATIONS_LMHA = [
-  { key: 'saturday',           label: 'Looked for appointment on Saturday' },
-  { key: 'sunday',             label: 'Looked for appointment on Sunday' },
-  { key: 'before_11am',        label: 'Looked for appointment before 11am' },
-  { key: 'after_5pm',          label: 'Looked for appointment after 5pm' },
-  { key: 'calls_out_of_hours', label: 'Calls out of hours' },
-  { key: 'text_out_of_hours',  label: 'Text out of hours' },
 ]
 
 const AGE_GROUPS = ['18-24', '25-34', '35-44', '45-54', '55-64', '65+']
@@ -196,6 +176,9 @@ export default function IntakeForm() {
   const [isRepeat, setIsRepeat] = useState(false)
   const [existingUser, setExistingUser] = useState(null)
 
+  // Whether this conversation happened over the phone rather than in person
+  const [heldOverPhone, setHeldOverPhone] = useState(false)
+
   // Page 1 — Service User Info
   const [su, setSu] = useState({
     full_name: '', phone: '', email: '',
@@ -219,7 +202,6 @@ export default function IntakeForm() {
     // Optional — can be left blank
     support_needs: [],
     onward_referrals: [],
-    limitations_detail: [],
   })
 
   const applyServiceUserFields = (data) => {
@@ -252,10 +234,8 @@ export default function IntakeForm() {
         .then(r => r.ok ? r.json() : null).catch(() => null),
     ]).then(([b, intake]) => {
       setBooking(b)
-      const cutoff = new Date()
-      cutoff.setDate(cutoff.getDate() - 21)
-      cutoff.setHours(0, 0, 0, 0)
-      setIsLocked(new Date(b.date) < cutoff)
+      setIsLocked(isBookingLocked(b.date, user?.isAdmin))
+      setHeldOverPhone(!!b.held_over_phone)
       if (b.full_name) setSu(prev => ({ ...prev, full_name: b.full_name, phone: b.phone || '' }))
       if (b.new_or_repeat === 'Repeat') setIsRepeat(true)
       if (intake) {
@@ -275,7 +255,6 @@ export default function IntakeForm() {
           signed_date: intake.signed_date || new Date().toISOString().slice(0, 10),
           support_needs: intake.support_needs || [],
           onward_referrals: intake.onward_referrals || [],
-          limitations_detail: intake.limitations_detail || [],
         })
       }
     }).finally(() => setLoading(false))
@@ -328,6 +307,7 @@ export default function IntakeForm() {
       service_user_id: booking?.service_user_id || null,
       is_repeat: isRepeat,
       existing_user_id: existingUser?.id || booking?.service_user_id || null,
+      held_over_phone: heldOverPhone,
       ...su,
       ...p2,
     }
@@ -373,7 +353,7 @@ export default function IntakeForm() {
 
       {isLocked && (
         <div className="bg-gray-100 border-2 border-gray-400 rounded-xl p-4 mb-4 text-gray-700 font-semibold">
-          This record is locked. Bookings older than 3 weeks cannot be edited.
+          {LOCK_MESSAGE}
         </div>
       )}
 
@@ -441,6 +421,21 @@ export default function IntakeForm() {
                 </button>
               </div>
             )}
+          </div>
+
+          <div className="card">
+            <label className="flex items-center gap-3 cursor-pointer">
+              <div
+                onClick={() => setHeldOverPhone(v => !v)}
+                className={`w-14 h-8 rounded-full transition-colors flex items-center px-1 ${heldOverPhone ? 'bg-blue-600' : 'bg-gray-300'}`}
+              >
+                <div className={`w-6 h-6 bg-white rounded-full shadow transition-transform ${heldOverPhone ? 'translate-x-6' : 'translate-x-0'}`} />
+              </div>
+              <span className="text-base font-semibold text-gray-700">📞 Conversation held over phone (not in person)</span>
+            </label>
+            <p className="text-xs text-gray-500 mt-2">
+              Records this as a support call rather than an in-person attendance.
+            </p>
           </div>
 
           <div className="card">

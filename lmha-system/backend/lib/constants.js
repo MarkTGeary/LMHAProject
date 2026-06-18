@@ -3,7 +3,8 @@ const LOCATION_RULES = {
     days: [1, 2, 3, 4, 5],
     startHour: 11,
     endHour: 17,
-    standardSlots: ['11:00', '12:00', '13:30', '14:30'],
+    // On the hour, 11:00–16:00, no daytime break
+    standardSlots: ['11:00', '12:00', '13:00', '14:00', '15:00', '16:00'],
   },
   'Solace Café': {
     days: [4, 5, 6, 0],

@@ -7,9 +7,12 @@ export default function MetricsPreview({ metrics }) {
     dateRange, location,
   } = metrics
 
+  // Contributing data rows are tinted green; section totals are tinted yellow.
   const Row = ({ label, value, total }) => (
-    <div className={`flex justify-between items-center py-2 border-b border-gray-100 last:border-0 ${total ? 'font-bold bg-gray-50 rounded px-2' : ''}`}>
-      <span className={`text-sm ${total ? 'text-gray-800' : 'text-gray-700'}`}>{label}</span>
+    <div className={`flex justify-between items-center py-2 px-2 rounded border-b border-gray-100 last:border-0 ${
+      total ? 'font-bold bg-yellow-100 border-yellow-200' : 'bg-green-50'
+    }`}>
+      <span className={`text-sm ${total ? 'text-gray-900' : 'text-gray-700'}`}>{label}</span>
       <span className="font-bold text-gray-900 text-lg min-w-[40px] text-right">{value ?? 0}</span>
     </div>
   )

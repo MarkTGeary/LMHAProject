@@ -121,7 +121,7 @@ export default function ActiveCases() {
           <div className="space-y-4">
             <div className="text-sm text-gray-500 font-medium">{bookings.length} record{bookings.length !== 1 ? 's' : ''}</div>
             {bookings.map(b => (
-              <BookingCard key={b.id} booking={b} onRefresh={load} />
+              <BookingCard key={b.id} booking={b} />
             ))}
           </div>
         )}

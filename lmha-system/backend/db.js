@@ -192,6 +192,16 @@ async function initAndMigrate() {
     await _client.execute('ALTER TABLE bookings ADD COLUMN limitations_detail TEXT');
     console.log('[DB] Migration complete: bookings.limitations_detail added.');
   }
+  if (!bookingCols.includes('information_seeking')) {
+    console.log('[DB] Running migration: adding bookings.information_seeking...');
+    await _client.execute('ALTER TABLE bookings ADD COLUMN information_seeking INTEGER DEFAULT 0');
+    console.log('[DB] Migration complete: bookings.information_seeking added.');
+  }
+  if (!bookingCols.includes('held_over_phone')) {
+    console.log('[DB] Running migration: adding bookings.held_over_phone...');
+    await _client.execute('ALTER TABLE bookings ADD COLUMN held_over_phone INTEGER DEFAULT 0');
+    console.log('[DB] Migration complete: bookings.held_over_phone added.');
+  }
 
   // ── Migration: booking_slot_locks → per-worker PK ────────────────
   const slotLockColsResult = await _client.execute('PRAGMA table_info(booking_slot_locks)');

@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
+import { useAuth } from '../App'
 import Layout from '../components/Layout'
 import { apiFetch } from '../lib/api'
-import { LOCK_DAYS } from '../lib/constants'
+import { isBookingLocked, LOCK_MESSAGE } from '../lib/constants'
 
 const SUPPORT_TYPES = [
   { code: 'SS', label: 'Social Support' },
@@ -12,45 +13,24 @@ const SUPPORT_TYPES = [
   { code: 'SP', label: 'Signposted' },
 ]
 
-const LIMITATIONS_SOLACE = [
-  { key: 'monday',             label: 'Looked for appointment on Monday' },
-  { key: 'tuesday',            label: 'Looked for appointment on Tuesday' },
-  { key: 'wednesday',          label: 'Looked for appointment on Wednesday' },
-  { key: 'before_6pm',         label: 'Looked for appointment before 6pm' },
-  { key: 'after_midnight',     label: 'Looked for appointment after midnight' },
-  { key: 'calls_out_of_hours', label: 'Calls out of hours' },
-  { key: 'text_out_of_hours',  label: 'Text out of hours' },
-]
-
-const LIMITATIONS_LMHA = [
-  { key: 'saturday',           label: 'Looked for appointment on Saturday' },
-  { key: 'sunday',             label: 'Looked for appointment on Sunday' },
-  { key: 'before_11am',        label: 'Looked for appointment before 11am' },
-  { key: 'after_5pm',          label: 'Looked for appointment after 5pm' },
-  { key: 'calls_out_of_hours', label: 'Calls out of hours' },
-  { key: 'text_out_of_hours',  label: 'Text out of hours' },
-]
-
 export default function OutcomeForm() {
   const { id } = useParams()
   const navigate = useNavigate()
+  const { user } = useAuth()
 
   const [booking, setBooking] = useState(null)
   const [hasIntake, setHasIntake] = useState(false)
   const [isLocked, setIsLocked] = useState(false)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
-  const [savingLimitations, setSavingLimitations] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState(false)
-  const [limitationsSaved, setLimitationsSaved] = useState(false)
 
   const [form, setForm] = useState({
     outcome: '',
     time_in: '',
     time_out: '',
     type_of_support: [],
-    limitations_detail: [],
     ed_diversion: null,
   })
 
@@ -59,10 +39,7 @@ export default function OutcomeForm() {
       .then(r => r.json())
       .then(b => {
         setBooking(b)
-        const cutoff = new Date()
-        cutoff.setDate(cutoff.getDate() - LOCK_DAYS)
-        cutoff.setHours(0, 0, 0, 0)
-        setIsLocked(new Date(b.date) < cutoff)
+        setIsLocked(isBookingLocked(b.date, user?.isAdmin))
         setForm({
           outcome: b.outcome !== 'Pending' ? b.outcome : '',
           time_in: b.time_in || '',
@@ -71,16 +48,12 @@ export default function OutcomeForm() {
             try { return b.type_of_support ? JSON.parse(b.type_of_support) : [] }
             catch { return [] }
           })(),
-          limitations_detail: (() => {
-            try { return b.limitations_detail ? JSON.parse(b.limitations_detail) : [] }
-            catch { return [] }
-          })(),
           ed_diversion: b.ed_diversion ?? null,
         })
         setHasIntake(!!b.intake_complete)
       })
       .finally(() => setLoading(false))
-  }, [id])
+  }, [id, user])
 
   const set = (field, value) => setForm(f => ({ ...f, [field]: value }))
 
@@ -91,33 +64,6 @@ export default function OutcomeForm() {
         ? f.type_of_support.filter(c => c !== code)
         : [...f.type_of_support, code],
     }))
-  }
-
-  const toggleLimitation = (key) => {
-    setForm(f => ({
-      ...f,
-      limitations_detail: f.limitations_detail.includes(key)
-        ? f.limitations_detail.filter(k => k !== key)
-        : [...f.limitations_detail, key],
-    }))
-  }
-
-  const saveLimitationsOnly = async () => {
-    setSavingLimitations(true); setError('')
-    try {
-      const res = await apiFetch(`/api/bookings/${id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ limitations_detail: form.limitations_detail }),
-      })
-      const data = await res.json()
-      if (!res.ok) { setError(data.error || 'Failed to save'); setSavingLimitations(false); return }
-      setLimitationsSaved(true)
-      setTimeout(() => setLimitationsSaved(false), 3000)
-    } catch {
-      setError('Network error.')
-    }
-    setSavingLimitations(false)
   }
 
   const saveOutcome = async () => {
@@ -133,7 +79,6 @@ export default function OutcomeForm() {
           time_in: form.time_in || null,
           time_out: form.time_out || null,
           type_of_support: form.type_of_support,
-          limitations_detail: form.limitations_detail,
           ed_diversion: form.ed_diversion,
         }),
       })
@@ -161,7 +106,6 @@ export default function OutcomeForm() {
           time_in: form.time_in || null,
           time_out: form.time_out || null,
           type_of_support: form.type_of_support,
-          limitations_detail: form.limitations_detail,
           ed_diversion: form.ed_diversion,
           status: 'Closed',
         }),
@@ -174,8 +118,6 @@ export default function OutcomeForm() {
     }
     setSaving(false)
   }
-
-  const limitationOptions = booking?.location === 'LMHA' ? LIMITATIONS_LMHA : LIMITATIONS_SOLACE
 
   if (loading) return <Layout title="Record Outcome"><div className="py-20 text-center text-gray-500">Loading...</div></Layout>
 
@@ -201,7 +143,7 @@ export default function OutcomeForm() {
 
         {isLocked && (
           <div className="bg-gray-100 border-2 border-gray-400 rounded-xl p-4 text-gray-700 font-semibold">
-            This record is locked. Bookings older than 3 weeks cannot be edited.
+            {LOCK_MESSAGE}
           </div>
         )}
 
@@ -283,47 +225,6 @@ export default function OutcomeForm() {
                     : 'bg-white border-gray-300 text-gray-700'
                 }`}
               >
-                {label}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Limitations */}
-        <div className="card">
-          <div className="flex items-start justify-between mb-3">
-            <div>
-              <h2 className="text-xl font-bold">Limitations</h2>
-              <p className="text-sm text-gray-500 mt-1">Did this person try to contact us when we couldn't help? Record even for no-shows or missed calls.</p>
-            </div>
-            {form.limitations_detail.length > 0 && (
-              <button
-                onClick={saveLimitationsOnly}
-                disabled={savingLimitations || isLocked}
-                className="btn-secondary btn-sm shrink-0 ml-3"
-              >
-                {savingLimitations ? 'Saving…' : limitationsSaved ? '✓ Saved' : 'Save Limitations'}
-              </button>
-            )}
-          </div>
-          <div className="space-y-2">
-            {limitationOptions.map(({ key, label }) => (
-              <button
-                key={key}
-                type="button"
-                onClick={() => toggleLimitation(key)}
-                disabled={isLocked}
-                className={`w-full min-h-[48px] text-left px-4 rounded-xl border-2 font-semibold text-sm transition-all flex items-center gap-3 ${
-                  form.limitations_detail.includes(key)
-                    ? 'bg-blue-50 border-blue-500 text-blue-800'
-                    : 'bg-white border-gray-200 text-gray-700 hover:border-gray-300'
-                }`}
-              >
-                <span className={`w-6 h-6 rounded border-2 flex items-center justify-center shrink-0 ${
-                  form.limitations_detail.includes(key) ? 'bg-blue-600 border-blue-600 text-white' : 'border-gray-400'
-                }`}>
-                  {form.limitations_detail.includes(key) && '✓'}
-                </span>
                 {label}
               </button>
             ))}

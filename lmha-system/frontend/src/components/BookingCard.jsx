@@ -1,5 +1,4 @@
 import { Link } from 'react-router-dom'
-import { apiFetch } from '../lib/api'
 
 const OUTCOME_BADGE = {
   'Attended': 'badge-attended',
@@ -17,18 +16,9 @@ const INTERACTION_ICONS = {
 
 }
 
-export default function BookingCard({ booking, onRefresh }) {
+export default function BookingCard({ booking }) {
   const outcomeClass = OUTCOME_BADGE[booking.outcome] || 'badge-pending'
-
-  const cancel = async () => {
-    if (!confirm('Mark this booking as Cancelled? It will remain in the database.')) return
-    await apiFetch(`/api/bookings/${booking.id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status: 'Cancelled' }),
-    })
-    if (onRefresh) onRefresh()
-  }
+  const isInfoSeeking = !!booking.information_seeking
 
   return (
     <div className={`card ${booking.status === 'Closed' ? 'opacity-75' : ''}`}>
@@ -61,6 +51,16 @@ export default function BookingCard({ booking, onRefresh }) {
             {INTERACTION_ICONS[booking.interaction_type] || '•'} {booking.interaction_type}
           </span>
         )}
+        {isInfoSeeking && (
+          <span className="text-sm bg-sky-100 text-sky-700 rounded-lg px-3 py-1 font-medium">
+            ℹ️ Info seeking
+          </span>
+        )}
+        {!isInfoSeeking && booking.held_over_phone ? (
+          <span className="text-sm bg-sky-100 text-sky-700 rounded-lg px-3 py-1 font-medium">
+            📞 By phone
+          </span>
+        ) : null}
         {booking.new_or_repeat && (
           <span className={`text-sm rounded-lg px-3 py-1 font-medium ${booking.new_or_repeat === 'New' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'}`}>
             {booking.new_or_repeat}
@@ -78,9 +78,11 @@ export default function BookingCard({ booking, onRefresh }) {
         <span className={outcomeClass}>
           {booking.outcome || 'Pending'}
         </span>
-        {booking.intake_complete
-          ? <span className="badge-intake-done">✓ Intake done</span>
-          : <span className="badge-intake-missing">⚠ Intake missing</span>
+        {isInfoSeeking
+          ? <span className="badge bg-sky-100 text-sky-700">No intake needed</span>
+          : booking.intake_complete
+            ? <span className="badge-intake-done">✓ Intake done</span>
+            : <span className="badge-intake-missing">⚠ Intake missing</span>
         }
         {booking.carer_attended ? <span className="badge bg-indigo-100 text-indigo-700">Carer present</span> : null}
         {booking.time_in && <span className="badge bg-gray-100 text-gray-600">In: {booking.time_in}</span>}
@@ -93,12 +95,12 @@ export default function BookingCard({ booking, onRefresh }) {
           <Link to={`/bookings/${booking.id}/edit`} className="btn-secondary btn-sm">
             ✏️ Edit
           </Link>
-          {!booking.intake_complete && (
+          {!isInfoSeeking && !booking.intake_complete && (
             <Link to={`/bookings/${booking.id}/intake`} className="btn-warning btn-sm">
               📝 Intake
             </Link>
           )}
-          {booking.intake_complete && (
+          {!isInfoSeeking && booking.intake_complete && (
             <Link to={`/bookings/${booking.id}/intake`} className="btn-outline btn-sm">
               📝 View Intake
             </Link>
@@ -107,11 +109,6 @@ export default function BookingCard({ booking, onRefresh }) {
             <Link to={`/bookings/${booking.id}/outcome`} className="btn-success btn-sm">
               ✅ Outcome
             </Link>
-          )}
-          {booking.status === 'Active' && (
-            <button onClick={cancel} className="btn-outline btn-sm text-gray-500">
-              ✕ Cancel
-            </button>
           )}
         </div>
       )}

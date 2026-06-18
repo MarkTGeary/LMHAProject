@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../db');
-const { LOCATION_RULES, LOCK_DAYS } = require('../lib/constants');
+const { LOCATION_RULES } = require('../lib/constants');
 const { badRequest, conflict, forbidden, notFound } = require('../lib/errors');
 const { slotsForBooking, timeToMinutes, toLockConflict } = require('../lib/bookingLocks');
 const {
@@ -106,11 +106,12 @@ function assertBookingIsInCurrentLocation(req, booking) {
   if (booking.location !== req.location) throw forbidden('Location does not match your current session');
 }
 
-function assertUnlocked(booking) {
-  const cutoff = localTodayStart();
-  cutoff.setDate(cutoff.getDate() - LOCK_DAYS);
-  if (new Date(booking.date + 'T12:00:00') < cutoff) {
-    throw forbidden('This record is locked - bookings older than 3 weeks cannot be edited');
+function assertEditable(req, booking) {
+  // Admins can edit any booking, including past ones and those beyond 3 weeks.
+  if (req.user?.isAdmin) return;
+  // Workers cannot edit bookings dated before today.
+  if (new Date(booking.date + 'T12:00:00') < localTodayStart()) {
+    throw forbidden('Only an admin can edit past bookings');
   }
 }
 
@@ -225,7 +226,7 @@ router.get('/available-slots', async (req, res, next) => {
     let sessionInfo = null;
     if (rules.maxSessionsPerNight && !req.user.isAdmin) {
       const countResult = await db.execute({
-        sql: `SELECT COUNT(*) as count FROM bookings WHERE created_by = ? AND date = ? AND location = ? AND status != 'Cancelled'`,
+        sql: `SELECT COUNT(*) as count FROM bookings WHERE created_by = ? AND date = ? AND location = ? AND status != 'Cancelled' AND information_seeking = 0`,
         args: [req.user.email, date, currentLocation],
       });
       sessionInfo = { used: Number(countResult.rows[0].count), max: rules.maxSessionsPerNight };
@@ -284,19 +285,25 @@ router.post('/', async (req, res, next) => {
       : null;
     const notes = normaliseString(req.body.notes, 'notes', { max: 5000 });
     const assigned_to = req.body.assigned_to ? normaliseString(req.body.assigned_to, 'assigned_to', { max: 200 }) : null;
+    const information_seeking = booleanInt(req.body.information_seeking ?? false, 'information_seeking');
+    const held_over_phone = booleanInt(req.body.held_over_phone ?? false, 'held_over_phone');
 
     const timeValid = validateBookingTime(location, date, time_booked);
     if (!timeValid.valid) return res.status(400).json({ error: timeValid.error });
 
-    if (!OVERLAP_ALLOWED_TYPES.includes(interaction_type)) {
+    // Information-seeking contacts and walk-ins/crises don't reserve an appointment slot.
+    const skipSlotLock = OVERLAP_ALLOWED_TYPES.includes(interaction_type) || information_seeking;
+
+    if (!skipSlotLock) {
       const existingConflict = await checkDoubleBooking(location, date, time_booked, assigned_to);
       if (existingConflict.conflict) throw conflict(existingConflict.message);
     }
 
     const locationRules = LOCATION_RULES[location];
-    if (locationRules.maxSessionsPerNight && !req.user.isAdmin) {
+    // Information-seeking support calls don't consume a nightly appointment slot.
+    if (locationRules.maxSessionsPerNight && !req.user.isAdmin && !information_seeking) {
       const countResult = await db.execute({
-        sql: `SELECT COUNT(*) as count FROM bookings WHERE created_by = ? AND date = ? AND location = ? AND status != 'Cancelled'`,
+        sql: `SELECT COUNT(*) as count FROM bookings WHERE created_by = ? AND date = ? AND location = ? AND status != 'Cancelled' AND information_seeking = 0`,
         args: [req.user.email, date, location],
       });
       if (Number(countResult.rows[0].count) >= locationRules.maxSessionsPerNight) {
@@ -313,10 +320,14 @@ router.post('/', async (req, res, next) => {
       });
     }
 
+    // An information-seeking contact is a completed support call, not a pending appointment.
+    const outcome = information_seeking ? 'Attended' : 'Pending';
+
     const bookingArgs = [
       location, date, time_booked, interaction_type,
       new_or_repeat, referred_from, type_of_support, carer_attended,
-      peer_support_worker, limitations, limitations_detail, notes, req.user.email, assigned_to,
+      peer_support_worker, limitations, limitations_detail, notes, outcome, req.user.email, assigned_to,
+      information_seeking, held_over_phone,
     ];
     const serviceUserSql = serviceUserId ? '?' : 'last_insert_rowid()';
     if (serviceUserId) bookingArgs.unshift(serviceUserId);
@@ -326,11 +337,12 @@ router.post('/', async (req, res, next) => {
       sql: `INSERT INTO bookings (
               service_user_id, location, date, time_booked, interaction_type,
               new_or_repeat, referred_from, type_of_support, carer_attended,
-              peer_support_worker, limitations, limitations_detail, notes, outcome, status, created_by, assigned_to
-            ) VALUES (${serviceUserSql}, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Pending', 'Active', ?, ?)`,
+              peer_support_worker, limitations, limitations_detail, notes, outcome, status, created_by, assigned_to,
+              information_seeking, held_over_phone
+            ) VALUES (${serviceUserSql}, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Active', ?, ?, ?, ?)`,
       args: bookingArgs,
     });
-    if (!OVERLAP_ALLOWED_TYPES.includes(interaction_type)) {
+    if (!skipSlotLock) {
       statements.push(...lockInsertStatements(location, date, time_booked, assigned_to));
     }
 
@@ -355,7 +367,7 @@ router.patch('/:id', async (req, res, next) => {
     if (!existingResult.rows.length) throw notFound();
     const existing = existingResult.rows[0];
     assertBookingIsInCurrentLocation(req, existing);
-    assertUnlocked(existing);
+    assertEditable(req, existing);
 
     const nextLocation = hasOwn(req.body, 'location')
       ? assertRequestLocation(req, req.body.location)
@@ -389,16 +401,20 @@ router.patch('/:id', async (req, res, next) => {
     if (hasOwn(req.body, 'ed_diversion')) values.ed_diversion = booleanInt(req.body.ed_diversion, 'ed_diversion', { nullable: true });
     if (hasOwn(req.body, 'service_user_id')) values.service_user_id = parseId(req.body.service_user_id, 'service_user_id', { required: false });
     if (hasOwn(req.body, 'assigned_to')) values.assigned_to = req.body.assigned_to ? normaliseString(req.body.assigned_to, 'assigned_to', { max: 200 }) : null;
+    if (hasOwn(req.body, 'information_seeking')) values.information_seeking = booleanInt(req.body.information_seeking, 'information_seeking');
+    if (hasOwn(req.body, 'held_over_phone')) values.held_over_phone = booleanInt(req.body.held_over_phone, 'held_over_phone');
 
     const newDate = values.date ?? existing.date;
     const newTime = values.time_booked ?? existing.time_booked;
     const newStatus = values.status ?? existing.status;
     const newAssignedTo = hasOwn(values, 'assigned_to') ? values.assigned_to : existing.assigned_to;
     const currentInteractionType = hasOwn(values, 'interaction_type') ? values.interaction_type : existing.interaction_type;
+    const currentInfoSeeking = hasOwn(values, 'information_seeking') ? values.information_seeking : existing.information_seeking;
+    const skipSlotLock = OVERLAP_ALLOWED_TYPES.includes(currentInteractionType) || Number(currentInfoSeeking) === 1;
     if (hasOwn(values, 'date') || hasOwn(values, 'time_booked') || hasOwn(values, 'assigned_to')) {
       const timeValid = validateBookingTime(existing.location, newDate, newTime);
       if (!timeValid.valid) return res.status(400).json({ error: timeValid.error });
-      if (!OVERLAP_ALLOWED_TYPES.includes(currentInteractionType)) {
+      if (!skipSlotLock) {
         const existingConflict = await checkDoubleBooking(existing.location, newDate, newTime, newAssignedTo, id);
         if (existingConflict.conflict) throw conflict(existingConflict.message);
       }
@@ -438,7 +454,7 @@ router.patch('/:id', async (req, res, next) => {
       { sql: 'DELETE FROM booking_slot_locks WHERE booking_id = ?', args: [id] },
       { sql: `UPDATE bookings SET ${sets.join(', ')} WHERE id = ?`, args },
     ];
-    if (newStatus !== 'Cancelled' && !OVERLAP_ALLOWED_TYPES.includes(currentInteractionType)) {
+    if (newStatus !== 'Cancelled' && !skipSlotLock) {
       statements.push(...lockInsertStatements(existing.location, newDate, newTime, newAssignedTo, '?', [id]));
     }
 

@@ -1,7 +1,6 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../db');
-const { LOCK_DAYS } = require('../lib/constants');
 const { badRequest, forbidden, notFound } = require('../lib/errors');
 const {
   assertRequestLocation,
@@ -90,11 +89,11 @@ function localTodayStart() {
   return today;
 }
 
-function assertUnlocked(booking) {
-  const cutoff = localTodayStart();
-  cutoff.setDate(cutoff.getDate() - LOCK_DAYS);
-  if (new Date(booking.date + 'T12:00:00') < cutoff) {
-    throw forbidden('This record is locked - bookings older than 3 weeks cannot be edited');
+function assertEditable(req, booking) {
+  // Admins can edit any booking; workers cannot edit bookings dated before today.
+  if (req.user?.isAdmin) return;
+  if (new Date(booking.date + 'T12:00:00') < localTodayStart()) {
+    throw forbidden('Only an admin can edit past bookings');
   }
 }
 
@@ -234,7 +233,7 @@ router.post('/', async (req, res, next) => {
     assertRequestLocation(req, booking.location);
     if (booking.location !== req.location) throw forbidden('Location does not match your current session');
 
-    assertUnlocked(booking);
+    assertEditable(req, booking);
 
     let userId = requestedServiceUserId || existingUserId;
 
@@ -281,6 +280,13 @@ router.post('/', async (req, res, next) => {
       await db.execute({
         sql: 'UPDATE bookings SET ed_diversion = ? WHERE id = ?',
         args: [booleanInt(ed_diversion, 'ed_diversion', { nullable: true }), bookingId],
+      });
+    }
+
+    if (hasOwn(req.body, 'held_over_phone')) {
+      await db.execute({
+        sql: 'UPDATE bookings SET held_over_phone = ? WHERE id = ?',
+        args: [booleanInt(req.body.held_over_phone, 'held_over_phone'), bookingId],
       });
     }
 

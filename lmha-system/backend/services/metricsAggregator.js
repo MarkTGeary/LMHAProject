@@ -30,7 +30,19 @@ async function aggregateMetrics(location, startDate, endDate) {
   const attended    = bookings.filter(b => b.outcome === 'Attended');
   const dna         = bookings.filter(b => b.outcome === 'Did Not Attend');
   const serviceBookings = bookings.filter(b => b.outcome !== 'Did Not Attend');
-  const phoneCalls  = attended.filter(b => b.interaction_type === 'Phone Call');
+
+  // A support call is a remote / information-seeking contact (phone or flagged):
+  // it counts toward support calls and Total People, but NOT toward bookings
+  // received or attendees-through-bookings.
+  const isSupportCall = (b) =>
+    Number(b.information_seeking) === 1 ||
+    Number(b.held_over_phone) === 1 ||
+    b.interaction_type === 'Phone Call';
+  // Walk-ins / crises are counted in their own buckets, separate from bookings.
+  const isWalkIn = (b) =>
+    b.interaction_type === 'Walk-In' || b.interaction_type === 'Crisis';
+
+  const supportCalls = serviceBookings.filter(isSupportCall);
   const peopleBookings = serviceBookings.filter(b =>
     b.service_user_id && (b.outcome === 'Attended' || b.intake_id)
   );
@@ -80,12 +92,15 @@ async function aggregateMetrics(location, startDate, endDate) {
 
   // --- Section 1: General Service Information ---
   const s1 = {
-    total_bookings_received:          bookings.length,
-    total_attendees_through_bookings: attended.length,
+    // Bookings received excludes support calls (phone / information-seeking contacts).
+    total_bookings_received:          bookings.filter(b => !isSupportCall(b)).length,
+    // Attendees through bookings = attended in-person appointments only — not
+    // walk-ins, crises or support calls (those have their own buckets).
+    total_attendees_through_bookings: attended.filter(b => !isSupportCall(b) && !isWalkIn(b)).length,
     total_walk_in_crisis: serviceBookings.filter(b =>
       b.interaction_type === 'Walk-In' && hasSupport(b, 'C')
     ).length,
-    total_support_calls:    phoneCalls.length,
+    total_support_calls:    supportCalls.length,
     total_walk_in_social: serviceBookings.filter(b =>
       b.interaction_type === 'Walk-In' && hasSupport(b, 'SS')
     ).length,

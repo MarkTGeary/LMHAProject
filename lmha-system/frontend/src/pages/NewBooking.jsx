@@ -4,7 +4,7 @@ import { useAuth } from '../App'
 import Layout from '../components/Layout'
 import RepeatUserSearch from '../components/RepeatUserSearch'
 import { apiFetch } from '../lib/api'
-import { LOCATION_RULES, LOCK_DAYS } from '../lib/constants'
+import { LOCATION_RULES, isBookingLocked, LOCK_MESSAGE } from '../lib/constants'
 
 const INTERACTION_TYPES = [
   { value: 'Phone Call', icon: '📞', color: 'bg-green-100 border-green-400 text-green-800' },
@@ -34,6 +34,7 @@ export default function NewBooking({ editMode }) {
     date: '',
     time_booked: '',
     interaction_type: '',
+    information_seeking: false,
     new_or_repeat: 'New',
     referred_from: '',
     carer_attended: false,
@@ -70,15 +71,13 @@ export default function NewBooking({ editMode }) {
       apiFetch(`/api/bookings/${id}`)
         .then(r => r.json())
         .then(b => {
-          const cutoff = new Date()
-          cutoff.setDate(cutoff.getDate() - LOCK_DAYS)
-          cutoff.setHours(0, 0, 0, 0)
-          setIsLocked(new Date(b.date) < cutoff)
+          setIsLocked(isBookingLocked(b.date, user?.isAdmin))
           setForm({
             location: b.location,
             date: b.date,
             time_booked: b.time_booked,
             interaction_type: b.interaction_type,
+            information_seeking: !!b.information_seeking,
             new_or_repeat: b.new_or_repeat || 'New',
             referred_from: b.referred_from || '',
             carer_attended: !!b.carer_attended,
@@ -90,7 +89,7 @@ export default function NewBooking({ editMode }) {
           })
         })
     }
-  }, [editMode, id])
+  }, [editMode, id, user])
 
   // Load slots when date/location change
   useEffect(() => {
@@ -111,6 +110,19 @@ export default function NewBooking({ editMode }) {
   }, [form.date, form.location, form.assigned_to])
 
   const set = (field, value) => setForm(f => ({ ...f, [field]: value }))
+
+  const nowHHMM = () => {
+    const d = new Date()
+    return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+  }
+
+  // Information-seeking contacts skip the slot picker — default a date/time so the record saves.
+  const setInfoSeeking = (val) => setForm(f => ({
+    ...f,
+    information_seeking: val,
+    date: val && !f.date ? new Date().toISOString().slice(0, 10) : f.date,
+    time_booked: val ? (f.time_booked || nowHHMM()) : f.time_booked,
+  }))
 
   const handleUserSelect = (user) => {
     setExistingUser(user)
@@ -134,7 +146,7 @@ export default function NewBooking({ editMode }) {
     if (!form.time_booked) return 'Time is required'
     if (!form.interaction_type) return 'Interaction type is required'
     if (!form.service_user_id && !form.full_name) return 'Name is required'
-    if (sessionInfo && sessionInfo.used >= sessionInfo.max) {
+    if (!form.information_seeking && sessionInfo && sessionInfo.used >= sessionInfo.max) {
       return `Session limit reached (${sessionInfo.used}/${sessionInfo.max} tonight). Contact an admin to add more.`
     }
     return null
@@ -174,7 +186,7 @@ export default function NewBooking({ editMode }) {
         {/* Lock banner */}
         {isLocked && (
           <div className="bg-gray-100 border-2 border-gray-400 rounded-xl p-4 text-gray-700 font-semibold">
-            This record is locked. Bookings older than 3 weeks cannot be edited.
+            {LOCK_MESSAGE}
           </div>
         )}
 
@@ -224,6 +236,11 @@ export default function NewBooking({ editMode }) {
 
           <div className="field">
             <label className="label">Time <span className="text-red-500">*</span></label>
+            {form.information_seeking ? (
+              <div className="text-sm text-gray-600 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
+                No appointment slot needed — this is logged as a support call at the current time.
+              </div>
+            ) : (<>
             {form.date ? (
               dayInvalid ? (
                 <div>
@@ -325,6 +342,7 @@ export default function NewBooking({ editMode }) {
                 </button>
               </div>
             )}
+            </>)}
           </div>
 
           <div className="field">
@@ -344,6 +362,39 @@ export default function NewBooking({ editMode }) {
                 </button>
               ))}
             </div>
+          </div>
+
+          <div className="field">
+            <label className="label">What kind of contact?</label>
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                type="button"
+                onClick={() => setInfoSeeking(false)}
+                className={`min-h-[56px] rounded-xl border-2 font-semibold text-base transition-all ${
+                  !form.information_seeking
+                    ? 'bg-blue-600 border-blue-600 text-white'
+                    : 'bg-white border-gray-300 text-gray-700 hover:border-blue-300'
+                }`}
+              >
+                📅 Booking / Appointment
+              </button>
+              <button
+                type="button"
+                onClick={() => setInfoSeeking(true)}
+                className={`min-h-[56px] rounded-xl border-2 font-semibold text-base transition-all ${
+                  form.information_seeking
+                    ? 'bg-blue-600 border-blue-600 text-white'
+                    : 'bg-white border-gray-300 text-gray-700 hover:border-blue-300'
+                }`}
+              >
+                ℹ️ Information Seeking
+              </button>
+            </div>
+            {form.information_seeking && (
+              <p className="text-xs text-gray-500 mt-2">
+                Logged as a support call looking for information — no appointment slot or intake form needed.
+              </p>
+            )}
           </div>
 
           <div className="field">
