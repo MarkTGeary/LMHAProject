@@ -77,6 +77,8 @@ const LIMITATIONS = [
   'after_midnight',
   'before_11am',
   'after_5pm',
+  'no_appointment_in_week',
+  'closed_short_staff',
   'calls_out_of_hours',
   'text_out_of_hours',
 ];
