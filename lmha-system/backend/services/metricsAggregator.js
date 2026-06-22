@@ -28,7 +28,23 @@ async function aggregateMetrics(location, startDate, endDate) {
   const standaloneLimitations = standaloneResult.rows;
 
   const dna         = bookings.filter(b => b.outcome === 'Did Not Attend');
-  const serviceBookings = bookings.filter(b => b.outcome !== 'Did Not Attend');
+  // A completed service interaction is one that actually happened: an attended
+  // booking, or an information-seeking support call (which is auto-attended).
+  // Pending (not-yet-attended / never-closed) bookings are excluded so the
+  // section totals reconcile with Total People below.
+  const serviceBookings = bookings.filter(b =>
+    b.outcome === 'Attended' || Number(b.information_seeking) === 1
+  );
+
+  // Each completed interaction maps to exactly one of the four Section-1 event
+  // buckets, so they stay mutually exclusive and sum cleanly into Total People.
+  // Information-seeking always wins (it's a support call) even if some other
+  // event type was set on the row.
+  function eventBucket(b) {
+    if (Number(b.information_seeking) === 1) return 'Support call';
+    return b.service_event_type || null;
+  }
+  const eventBuckets = serviceBookings.map(eventBucket);
 
   // Build user list from all service interactions with a known service user —
   // not just attended/intake-complete ones — so demographics capture everyone
@@ -88,12 +104,12 @@ async function aggregateMetrics(location, startDate, endDate) {
       b.interaction_type !== 'Walk-In' &&
       b.interaction_type !== 'Crisis'
     ).length,
-    // The four event types are mutually exclusive (one per attended booking)
-    // so they sum cleanly into total_people below. Set in the Outcome form.
-    total_attendees_through_bookings: bookings.filter(b => b.service_event_type === 'Attended through booking').length,
-    total_walk_in_crisis:             bookings.filter(b => b.service_event_type === 'Walk-in crisis').length,
-    total_support_calls:              bookings.filter(b => b.service_event_type === 'Support call' || Number(b.information_seeking) === 1).length,
-    total_walk_in_social:             bookings.filter(b => b.service_event_type === 'Walk-in social').length,
+    // The four event types are mutually exclusive (one per completed interaction
+    // via eventBucket) so they sum cleanly into total_people below.
+    total_attendees_through_bookings: eventBuckets.filter(t => t === 'Attended through booking').length,
+    total_walk_in_crisis:             eventBuckets.filter(t => t === 'Walk-in crisis').length,
+    total_support_calls:              eventBuckets.filter(t => t === 'Support call').length,
+    total_walk_in_social:             eventBuckets.filter(t => t === 'Walk-in social').length,
     total_dna:              dna.length,
     total_carer_attendees:  bookings.filter(b => b.carer_attended).length,
     total_male:             users.filter(u => u.gender === 'Male').length,
