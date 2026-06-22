@@ -13,7 +13,6 @@ export default function Settings() {
   const [loading, setLoading] = useState(true)
   const [adding, setAdding] = useState(false)
   const [updating, setUpdating] = useState('')
-  const [eraseId, setEraseId] = useState('')
   const [eraseUser, setEraseUser] = useState(null)
   const [erasing, setErasing] = useState(false)
   const [error, setError] = useState('')
@@ -84,9 +83,10 @@ export default function Settings() {
   const eraseServiceUser = async () => {
     setError('')
     setSuccess('')
-    const id = eraseId.trim()
-    if (!id || !/^\d+$/.test(id)) { setError('Enter a valid service user ID'); return }
-    if (!window.confirm(`Erase personal data for service user #${id}? This keeps anonymous case records for reporting but removes identifying details.`)) return
+    if (!eraseUser) { setError('Search for and select a service user first'); return }
+    const id = eraseUser.id
+    const name = eraseUser.full_name
+    if (!window.confirm(`Erase personal data for ${name}? This keeps anonymous case records for reporting but removes identifying details.`)) return
     setErasing(true)
     const res = await apiFetch(`/api/admin/service-users/${encodeURIComponent(id)}/erase`, {
       method: 'POST',
@@ -94,9 +94,8 @@ export default function Settings() {
     const data = await res.json()
     setErasing(false)
     if (!res.ok) { setError(data.error || 'Failed to erase personal data'); return }
-    setEraseId('')
     setEraseUser(null)
-    setSuccess(`Personal data erased for service user #${id}`)
+    setSuccess(`Personal data erased for ${name}`)
   }
 
   return (
@@ -238,31 +237,25 @@ export default function Settings() {
           </p>
           <div className="mb-3">
             <RepeatUserSearch
-              onSelect={u => { setEraseUser(u); setEraseId(String(u.id)); setError(''); setSuccess('') }}
-              onClear={() => { setEraseUser(null); setEraseId('') }}
+              onSelect={u => { setEraseUser(u); setError(''); setSuccess('') }}
+              onClear={() => { setEraseUser(null) }}
             />
           </div>
-          <div className="flex gap-2">
-            <input
-              className="input"
-              inputMode="numeric"
-              placeholder="Service user ID"
-              value={eraseId}
-              onChange={e => { setEraseId(e.target.value); setEraseUser(null); setError(''); setSuccess('') }}
-            />
+          <div className="flex items-center gap-3">
             <button
               onClick={eraseServiceUser}
-              disabled={erasing || !eraseId.trim()}
+              disabled={erasing || !eraseUser}
               className="btn-danger px-5"
             >
               {erasing ? 'Erasing...' : 'Erase'}
             </button>
+            {eraseUser && (
+              <p className="text-sm text-gray-500">
+                Selected: <span className="font-medium text-gray-700">{eraseUser.full_name}</span>
+                {eraseUser.phone ? ` · ${eraseUser.phone}` : ''}
+              </p>
+            )}
           </div>
-          {eraseUser && (
-            <p className="text-xs text-gray-400 mt-2">
-              Selected: {eraseUser.full_name}
-            </p>
-          )}
         </div>
 
       </div>
