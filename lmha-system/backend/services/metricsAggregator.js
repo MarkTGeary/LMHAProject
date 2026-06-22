@@ -89,12 +89,13 @@ async function aggregateMetrics(location, startDate, endDate) {
 
   // --- Section 1: General Service Information ---
   const s1 = {
-    total_bookings_received:          bookings.length,
+    // Information-seeking contacts are support calls, not booked appointments.
+    total_bookings_received:          bookings.filter(b => Number(b.information_seeking) !== 1).length,
     // The four event types are mutually exclusive (one per attended booking)
     // so they sum cleanly into total_people below. Set in the Outcome form.
     total_attendees_through_bookings: bookings.filter(b => b.service_event_type === 'Attended through booking').length,
     total_walk_in_crisis:             bookings.filter(b => b.service_event_type === 'Walk-in crisis').length,
-    total_support_calls:              bookings.filter(b => b.service_event_type === 'Support call').length,
+    total_support_calls:              bookings.filter(b => b.service_event_type === 'Support call' || Number(b.information_seeking) === 1).length,
     total_walk_in_social:             bookings.filter(b => b.service_event_type === 'Walk-in social').length,
     total_dna:              dna.length,
     total_carer_attendees:  bookings.filter(b => b.carer_attended).length,

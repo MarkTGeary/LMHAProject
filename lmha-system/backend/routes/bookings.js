@@ -323,12 +323,13 @@ router.post('/', async (req, res, next) => {
 
     // An information-seeking contact is a completed support call, not a pending appointment.
     const outcome = information_seeking ? 'Attended' : 'Pending';
+    const service_event_type_auto = information_seeking ? 'Support call' : null;
 
     const bookingArgs = [
       location, date, time_booked, interaction_type,
       new_or_repeat, referred_from, type_of_support, carer_attended,
       peer_support_worker, limitations, limitations_detail, notes, outcome, req.user.email, assigned_to,
-      information_seeking, held_over_phone,
+      information_seeking, held_over_phone, service_event_type_auto,
     ];
     const serviceUserSql = serviceUserId ? '?' : 'last_insert_rowid()';
     if (serviceUserId) bookingArgs.unshift(serviceUserId);
@@ -339,8 +340,8 @@ router.post('/', async (req, res, next) => {
               service_user_id, location, date, time_booked, interaction_type,
               new_or_repeat, referred_from, type_of_support, carer_attended,
               peer_support_worker, limitations, limitations_detail, notes, outcome, status, created_by, assigned_to,
-              information_seeking, held_over_phone
-            ) VALUES (${serviceUserSql}, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Active', ?, ?, ?, ?)`,
+              information_seeking, held_over_phone, service_event_type
+            ) VALUES (${serviceUserSql}, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Active', ?, ?, ?, ?, ?)`,
       args: bookingArgs,
     });
     if (!skipSlotLock) {
