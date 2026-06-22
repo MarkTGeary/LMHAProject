@@ -49,8 +49,7 @@ const SPREADSHEET_IDS = {
 //  Row 78  (blank)
 //  Rows 79-84: Miscellaneous/Feedback (not tracked in system)
 //  Row 85  (blank)
-//  Row 86  Limitations / INDV not facilitated
-//  ...
+//  Row 87+  Limitations (days/times/etc.)
 //  Row 96  Total (Limitations)
 // ─────────────────────────────────────────────────────────────────
 const ROW_MAP = {
@@ -153,7 +152,6 @@ const ROW_MAP = {
   // lim_day1/2/3  = Mon/Tue/Wed for Solace Café, Sat/Sun/(none) for LMHA
   // lim_time_early = before 6pm for Solace, before 11am for LMHA
   // lim_time_late  = after midnight for Solace, after 5pm for LMHA
-  lim_indv_not_facilitated:         86,
   lim_day1:                         87,
   lim_day2:                         88,
   lim_day3:                         89,
@@ -447,7 +445,6 @@ async function readMetrics(location, startDate, endDate) {
   };
 
   const limitations = {
-    lim_indv_not_facilitated: flat.lim_indv_not_facilitated,
     lim_day1:                 flat.lim_day1,
     lim_day2:                 flat.lim_day2,
     lim_day3:                 flat.lim_day3,

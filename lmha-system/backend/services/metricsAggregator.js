@@ -228,10 +228,6 @@ async function aggregateMetrics(location, startDate, endDate) {
                       limitations.lim_time_early + limitations.lim_time_late +
                       limitations.lim_no_appointment_week + limitations.lim_closed_short_staff +
                       limitations.lim_calls_out_hours + limitations.lim_text_out_hours;
-  limitations.lim_indv_not_facilitated = bookings.filter(b =>
-    parseJson(b.limitations_detail).length > 0 || parseJson(b.intake_limitations_detail).length > 0
-  ).length + standaloneLimitations.length;
-
   return {
     section1: s1,
     section2: s2,

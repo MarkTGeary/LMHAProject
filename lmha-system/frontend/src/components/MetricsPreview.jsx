@@ -129,7 +129,6 @@ export default function MetricsPreview({ metrics }) {
       </Section>
 
       <Section title="Limitations — Out-of-Hours Contact">
-        <Row label="Individuals who could not be facilitated" value={lim?.lim_indv_not_facilitated} info />
         {location === 'LMHA' ? (
           <>
             <Row label="Looked for appointment on Saturday" value={lim?.lim_day1} />
