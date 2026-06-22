@@ -225,7 +225,17 @@ export default function NewBooking({ editMode }) {
               type="date"
               className="input"
               value={form.date}
-              onChange={e => { set('date', e.target.value); set('time_booked', '') }}
+              onChange={e => {
+                const date = e.target.value
+                // For a normal booking the time is a slot tied to the date, so clear it.
+                // For an information-seeking call the time is entered manually (and may be
+                // backdated), so keep it — defaulting to now if it isn't set yet.
+                setForm(f => ({
+                  ...f,
+                  date,
+                  time_booked: f.information_seeking ? (f.time_booked || nowHHMM()) : '',
+                }))
+              }}
             />
             {dayInvalid && (
               <p className="text-amber-600 text-sm mt-1">
@@ -237,8 +247,13 @@ export default function NewBooking({ editMode }) {
           <div className="field">
             <label className="label">Time <span className="text-red-500">*</span></label>
             {form.information_seeking ? (
-              <div className="text-sm text-gray-600 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
-                No appointment slot needed — this is logged as a support call at the current time.
+              <div>
+                <p className="text-xs text-gray-600 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 mb-2">
+                  No appointment slot needed — logged as a support call. If you're filling
+                  this in later, set the time it actually happened.
+                </p>
+                <input type="time" className="input" value={form.time_booked}
+                  onChange={e => set('time_booked', e.target.value)} step="60" />
               </div>
             ) : (<>
             {form.date ? (
