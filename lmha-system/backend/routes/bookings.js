@@ -158,9 +158,13 @@ router.get('/', async (req, res, next) => {
       sql += ' AND b.date BETWEEN ? AND ?';
       args.push(fmtDate(mon), fmtDate(sun));
     }
-    if (start_date || end_date) {
-      sql += ' AND b.date BETWEEN ? AND ?';
-      args.push(parseDateString(start_date, 'start_date'), parseDateString(end_date, 'end_date'));
+    if (start_date) {
+      sql += ' AND b.date >= ?';
+      args.push(parseDateString(start_date, 'start_date'));
+    }
+    if (end_date) {
+      sql += ' AND b.date <= ?';
+      args.push(parseDateString(end_date, 'end_date'));
     }
     if (intake_status === 'missing') {
       sql += ' AND i.id IS NULL';
