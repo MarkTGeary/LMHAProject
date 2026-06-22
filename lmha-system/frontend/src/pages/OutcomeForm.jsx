@@ -50,8 +50,10 @@ export default function OutcomeForm() {
       .then(b => {
         setBooking(b)
         setIsLocked(isBookingLocked(b.date, user?.isAdmin))
+        const isWalkIn = ['Walk-In', 'Crisis'].includes(b.interaction_type)
         setForm({
-          outcome: b.outcome !== 'Pending' ? b.outcome : '',
+          // Walk-ins / crises mean the person was present, so they can only be Attended.
+          outcome: b.outcome !== 'Pending' ? b.outcome : (isWalkIn ? 'Attended' : ''),
           service_event_type: b.service_event_type || (b.held_over_phone ? 'Support call' : ''),
           time_in: b.time_in || '',
           time_out: b.time_out || '',
@@ -135,6 +137,8 @@ export default function OutcomeForm() {
 
   if (loading) return <Layout title="Record Outcome"><div className="py-20 text-center text-gray-500">Loading...</div></Layout>
 
+  const isWalkIn = booking && ['Walk-In', 'Crisis'].includes(booking.interaction_type)
+
   return (
     <Layout title="Record Outcome" back="/cases">
       <div className="space-y-5 pb-10">
@@ -164,8 +168,13 @@ export default function OutcomeForm() {
         {/* Outcome */}
         <div className="card">
           <h2 className="text-xl font-bold mb-4">Outcome <span className="text-red-500">*</span></h2>
+          {isWalkIn && (
+            <p className="text-sm text-gray-500 mb-3">
+              Walk-in / crisis contacts are recorded as Attended — the person was present.
+            </p>
+          )}
           <div className="grid grid-cols-2 gap-3">
-            {['Attended', 'Did Not Attend'].map(v => (
+            {(isWalkIn ? ['Attended'] : ['Attended', 'Did Not Attend']).map(v => (
               <button
                 key={v}
                 onClick={() => set('outcome', v)}

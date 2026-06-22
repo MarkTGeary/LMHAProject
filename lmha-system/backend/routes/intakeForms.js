@@ -90,10 +90,13 @@ function localTodayStart() {
 }
 
 function assertEditable(req, booking) {
-  // Admins can edit any booking; workers cannot edit bookings dated before today.
+  // Admins can edit any booking. Workers get a 7-day grace window so intake can
+  // be written up after the fact; anything older than a week is admin-only.
   if (req.user?.isAdmin) return;
-  if (new Date(booking.date + 'T12:00:00') < localTodayStart()) {
-    throw forbidden('Only an admin can edit past bookings');
+  const cutoff = localTodayStart();
+  cutoff.setDate(cutoff.getDate() - 7);
+  if (new Date(booking.date + 'T12:00:00') < cutoff) {
+    throw forbidden('Only an admin can edit bookings older than a week');
   }
 }
 

@@ -30,19 +30,6 @@ async function aggregateMetrics(location, startDate, endDate) {
   const dna         = bookings.filter(b => b.outcome === 'Did Not Attend');
   const serviceBookings = bookings.filter(b => b.outcome !== 'Did Not Attend');
 
-  // A support call is a remote / information-seeking contact (phone or flagged):
-  // it counts toward support calls and Total People, but NOT toward bookings
-  // received or attendees-through-bookings.
-  const isSupportCall = (b) =>
-    Number(b.information_seeking) === 1 ||
-    Number(b.held_over_phone) === 1 ||
-    b.interaction_type === 'Phone Call';
-  // Walk-ins / crises are counted in their own buckets, separate from bookings.
-  const isWalkIn = (b) =>
-    b.interaction_type === 'Walk-In' || b.interaction_type === 'Crisis';
-
-  const supportCalls = serviceBookings.filter(isSupportCall);
-
   // Build user list from all service interactions with a known service user —
   // not just attended/intake-complete ones — so demographics capture everyone
   // supported and stay consistent with total_people counts.
@@ -116,7 +103,9 @@ async function aggregateMetrics(location, startDate, endDate) {
     age_45_54:  users.filter(u => u.age_group === '45-54').length,
     age_55_64:  users.filter(u => u.age_group === '55-64').length,
     age_65_plus: users.filter(u => u.age_group === '65+').length,
-    age_unknown: users.filter(u => u.age_group === 'Unknown').length,
+    // Walk-ins / info-calls often create a service_user with no recorded age, so
+    // treat NULL/blank the same as an explicit 'Unknown' to avoid undercounting.
+    age_unknown: users.filter(u => u.age_group === 'Unknown' || !u.age_group).length,
   };
   // Total People supported = sum of the four mutually-exclusive event types.
   s1.total_people = s1.total_attendees_through_bookings + s1.total_support_calls +

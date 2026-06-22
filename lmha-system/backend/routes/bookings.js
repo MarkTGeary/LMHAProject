@@ -110,9 +110,13 @@ function assertBookingIsInCurrentLocation(req, booking) {
 function assertEditable(req, booking) {
   // Admins can edit any booking, including past ones and those beyond 3 weeks.
   if (req.user?.isAdmin) return;
-  // Workers cannot edit bookings dated before today.
-  if (new Date(booking.date + 'T12:00:00') < localTodayStart()) {
-    throw forbidden('Only an admin can edit past bookings');
+  // Workers get a 7-day grace window so outcomes/intake can be written up after
+  // the fact (e.g. late-night Solace sessions finished after midnight, or the
+  // next day). Anything older than a week is admin-only.
+  const cutoff = localTodayStart();
+  cutoff.setDate(cutoff.getDate() - 7);
+  if (new Date(booking.date + 'T12:00:00') < cutoff) {
+    throw forbidden('Only an admin can edit bookings older than a week');
   }
 }
 
@@ -224,11 +228,13 @@ router.get('/available-slots', async (req, res, next) => {
       }
     }
 
+    // The nightly session cap is per assigned worker (matching the per-worker
+    // slot-lock model), so it only applies once an assignee is chosen.
     let sessionInfo = null;
-    if (rules.maxSessionsPerNight && !req.user.isAdmin) {
+    if (rules.maxSessionsPerNight && !req.user.isAdmin && requestedAssignee) {
       const countResult = await db.execute({
-        sql: `SELECT COUNT(*) as count FROM bookings WHERE created_by = ? AND date = ? AND location = ? AND status != 'Cancelled' AND information_seeking = 0`,
-        args: [req.user.email, date, currentLocation],
+        sql: `SELECT COUNT(*) as count FROM bookings WHERE assigned_to = ? AND date = ? AND location = ? AND status != 'Cancelled' AND information_seeking = 0`,
+        args: [requestedAssignee, date, currentLocation],
       });
       sessionInfo = { used: Number(countResult.rows[0].count), max: rules.maxSessionsPerNight };
     }
@@ -301,14 +307,15 @@ router.post('/', async (req, res, next) => {
     }
 
     const locationRules = LOCATION_RULES[location];
-    // Information-seeking support calls don't consume a nightly appointment slot.
-    if (locationRules.maxSessionsPerNight && !req.user.isAdmin && !information_seeking) {
+    // The nightly session cap is per assigned worker, so it only applies once an
+    // assignee is set. Information-seeking support calls don't consume a slot.
+    if (locationRules.maxSessionsPerNight && !req.user.isAdmin && !information_seeking && assigned_to) {
       const countResult = await db.execute({
-        sql: `SELECT COUNT(*) as count FROM bookings WHERE created_by = ? AND date = ? AND location = ? AND status != 'Cancelled' AND information_seeking = 0`,
-        args: [req.user.email, date, location],
+        sql: `SELECT COUNT(*) as count FROM bookings WHERE assigned_to = ? AND date = ? AND location = ? AND status != 'Cancelled' AND information_seeking = 0`,
+        args: [assigned_to, date, location],
       });
       if (Number(countResult.rows[0].count) >= locationRules.maxSessionsPerNight) {
-        return res.status(400).json({ error: `Maximum ${locationRules.maxSessionsPerNight} sessions per night reached` });
+        return res.status(400).json({ error: `Maximum ${locationRules.maxSessionsPerNight} sessions per night reached for ${assigned_to}` });
       }
     }
 
@@ -414,6 +421,25 @@ router.patch('/:id', async (req, res, next) => {
     const currentInteractionType = hasOwn(values, 'interaction_type') ? values.interaction_type : existing.interaction_type;
     const currentInfoSeeking = hasOwn(values, 'information_seeking') ? values.information_seeking : existing.information_seeking;
     const skipSlotLock = OVERLAP_ALLOWED_TYPES.includes(currentInteractionType) || Number(currentInfoSeeking) === 1;
+
+    // Mirror create-time behaviour: turning a booking into an information-seeking
+    // contact makes it a completed support call. Don't clobber fields the caller
+    // set explicitly in the same request.
+    const turningOnInfoSeeking =
+      hasOwn(values, 'information_seeking') &&
+      Number(values.information_seeking) === 1 &&
+      Number(existing.information_seeking) !== 1;
+    if (turningOnInfoSeeking) {
+      if (!hasOwn(values, 'outcome')) values.outcome = 'Attended';
+      if (!hasOwn(values, 'service_event_type')) values.service_event_type = 'Support call';
+    }
+
+    // Walk-in and crisis contacts mean the person was physically present, so they
+    // can never be a "Did Not Attend".
+    if (OVERLAP_ALLOWED_TYPES.includes(currentInteractionType) &&
+        hasOwn(values, 'outcome') && values.outcome === 'Did Not Attend') {
+      throw conflict('Walk-in and crisis contacts cannot be marked Did Not Attend — the person was present');
+    }
     if (hasOwn(values, 'date') || hasOwn(values, 'time_booked') || hasOwn(values, 'assigned_to')) {
       const timeValid = validateBookingTime(existing.location, newDate, newTime);
       if (!timeValid.valid) return res.status(400).json({ error: timeValid.error });
