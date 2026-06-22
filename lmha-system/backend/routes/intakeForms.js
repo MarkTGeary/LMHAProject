@@ -80,7 +80,7 @@ const LIMITATIONS = [
   'text_out_of_hours',
 ];
 const AGE_GROUPS = ['18-24', '25-34', '35-44', '45-54', '55-64', '65+', 'Unknown'];
-const GENDERS = ['Male', 'Female', 'Prefer not to say'];
+const GENDERS = ['Male', 'Female', 'Other', 'Prefer not to say'];
 const YES_NO = ['Yes', 'No'];
 
 function localTodayStart() {

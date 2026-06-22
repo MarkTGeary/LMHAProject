@@ -52,7 +52,7 @@ export default function OutcomeForm() {
         setIsLocked(isBookingLocked(b.date, user?.isAdmin))
         setForm({
           outcome: b.outcome !== 'Pending' ? b.outcome : '',
-          service_event_type: b.service_event_type || '',
+          service_event_type: b.service_event_type || (b.held_over_phone ? 'Support call' : ''),
           time_in: b.time_in || '',
           time_out: b.time_out || '',
           type_of_support: (() => {
@@ -187,6 +187,11 @@ export default function OutcomeForm() {
         {form.outcome === 'Attended' && (
           <div className="card">
             <h2 className="text-xl font-bold mb-1">How was this person supported? <span className="text-red-500">*</span></h2>
+            {booking?.held_over_phone && (
+              <p className="text-sm text-sky-700 bg-sky-50 border border-sky-200 rounded-lg px-3 py-2 mb-3">
+                📞 This conversation was held over the phone — pre-selected as a support call.
+              </p>
+            )}
             <p className="text-sm text-gray-500 mb-4">Pick one. These feed the four separate Section 1 metrics and add up to Total People supported.</p>
             <div className="grid grid-cols-2 gap-3">
               {SERVICE_EVENT_TYPES.map(({ value, icon, label }) => (

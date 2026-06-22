@@ -284,7 +284,6 @@ export default function NewBooking({ editMode }) {
                       }`}
                     >
                       {s.time}
-                      <div className="text-xs font-normal opacity-60">50 min</div>
                     </button>
                   ))}
                 </div>
@@ -494,9 +493,6 @@ export default function NewBooking({ editMode }) {
           {saving ? 'Saving...' : editMode ? 'Update Booking' : 'Create Booking'}
         </button>
 
-        <button onClick={() => navigate('/cases')} className="btn-secondary btn-lg w-full">
-          Cancel
-        </button>
       </div>
     </Layout>
   )

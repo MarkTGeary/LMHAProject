@@ -66,31 +66,6 @@ const ONWARD_REFERRAL_OPTIONS = [
   ]},
 ]
 
-// Solace Café: Thu–Sun 18:00–00:00 — closed Mon/Tue/Wed, before 6pm, after midnight
-const LIMITATIONS_SOLACE = [
-  { key: 'monday',             label: 'Looked for appointment on Monday' },
-  { key: 'tuesday',            label: 'Looked for appointment on Tuesday' },
-  { key: 'wednesday',          label: 'Looked for appointment on Wednesday' },
-  { key: 'before_6pm',         label: 'Looked for appointment before 6pm' },
-  { key: 'after_midnight',     label: 'Looked for appointment after midnight' },
-  { key: 'no_appointment_in_week', label: 'Could not offer an appointment within the week' },
-  { key: 'closed_short_staff',     label: 'Forced to close due to short staff' },
-  { key: 'calls_out_of_hours', label: 'Calls out of hours' },
-  { key: 'text_out_of_hours',  label: 'Text out of hours' },
-]
-
-// LMHA: Mon–Fri 11:00–17:00 — closed weekends, before 11am, after 5pm
-const LIMITATIONS_LMHA = [
-  { key: 'saturday',           label: 'Looked for appointment on Saturday' },
-  { key: 'sunday',             label: 'Looked for appointment on Sunday' },
-  { key: 'before_11am',        label: 'Looked for appointment before 11am' },
-  { key: 'after_5pm',          label: 'Looked for appointment after 5pm' },
-  { key: 'no_appointment_in_week', label: 'Could not offer an appointment within the week' },
-  { key: 'closed_short_staff',     label: 'Forced to close due to short staff' },
-  { key: 'calls_out_of_hours', label: 'Calls out of hours' },
-  { key: 'text_out_of_hours',  label: 'Text out of hours' },
-]
-
 const AGE_GROUPS = ['18-24', '25-34', '35-44', '45-54', '55-64', '65+', 'Unknown']
 
 function RadioGroup({ label, options, value, onChange, required }) {
@@ -474,7 +449,7 @@ export default function IntakeForm() {
                 <RadioGroup label="Age Group" options={AGE_GROUPS} value={su.age_group}
                   onChange={v => setSuField('age_group', v)} />
 
-                <RadioGroup label="Gender" options={['Male', 'Female', 'Prefer not to say']}
+                <RadioGroup label="Gender" options={['Male', 'Female', 'Other', 'Prefer not to say']}
                   value={su.gender} onChange={v => setSuField('gender', v)} />
 
                 <RadioGroup label="Living Alone?" options={['Yes', 'No']}

@@ -89,8 +89,14 @@ async function aggregateMetrics(location, startDate, endDate) {
 
   // --- Section 1: General Service Information ---
   const s1 = {
-    // Information-seeking contacts are support calls, not booked appointments.
-    total_bookings_received:          bookings.filter(b => Number(b.information_seeking) !== 1).length,
+    // Only in-person appointments count as bookings received.
+    // Phone calls (held_over_phone or Phone Call type) and information-seeking
+    // contacts are support calls, not booked appointments.
+    total_bookings_received: bookings.filter(b =>
+      Number(b.information_seeking) !== 1 &&
+      Number(b.held_over_phone) !== 1 &&
+      b.interaction_type !== 'Phone Call'
+    ).length,
     // The four event types are mutually exclusive (one per attended booking)
     // so they sum cleanly into total_people below. Set in the Outcome form.
     total_attendees_through_bookings: bookings.filter(b => b.service_event_type === 'Attended through booking').length,
@@ -101,7 +107,7 @@ async function aggregateMetrics(location, startDate, endDate) {
     total_carer_attendees:  bookings.filter(b => b.carer_attended).length,
     total_male:             users.filter(u => u.gender === 'Male').length,
     total_female:           users.filter(u => u.gender === 'Female').length,
-    total_other_gender:     users.filter(u => u.gender === 'Prefer not to say').length,
+    total_other_gender:     users.filter(u => u.gender === 'Prefer not to say' || u.gender === 'Other').length,
     total_new:              serviceBookings.filter(b => b.new_or_repeat === 'New').length,
     total_repeat:           serviceBookings.filter(b => b.new_or_repeat === 'Repeat').length,
     age_18_24:  users.filter(u => u.age_group === '18-24').length,
