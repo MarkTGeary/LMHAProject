@@ -6,10 +6,12 @@
     { "source": "/api/bookings", "destination": "/api/proxy?path=api/bookings" },
     { "source": "/api/service-users", "destination": "/api/proxy?path=api/service-users" },
     { "source": "/api/intake-forms", "destination": "/api/proxy?path=api/intake-forms" },
+    { "source": "/api/limitations", "destination": "/api/proxy?path=api/limitations" },
     { "source": "/api/admin/(.*)", "destination": "/api/proxy?path=api/admin/$1" },
     { "source": "/api/bookings/(.*)", "destination": "/api/proxy?path=api/bookings/$1" },
     { "source": "/api/service-users/(.*)", "destination": "/api/proxy?path=api/service-users/$1" },
     { "source": "/api/intake-forms/(.*)", "destination": "/api/proxy?path=api/intake-forms/$1" },
+    { "source": "/api/limitations/(.*)", "destination": "/api/proxy?path=api/limitations/$1" },
     { "source": "/api/metrics/(.*)", "destination": "/api/proxy?path=api/metrics/$1" },
     { "source": "/api/health", "destination": "/api/proxy?path=api/health" },
     { "source": "/(.*)", "destination": "/index.html" }

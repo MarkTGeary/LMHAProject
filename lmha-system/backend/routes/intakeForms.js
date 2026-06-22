@@ -66,19 +66,6 @@ const ONWARD_REFERRALS = [
   'citizens_information',
   'ags',
 ];
-const LIMITATIONS = [
-  'monday',
-  'tuesday',
-  'wednesday',
-  'saturday',
-  'sunday',
-  'before_6pm',
-  'after_midnight',
-  'before_11am',
-  'after_5pm',
-  'calls_out_of_hours',
-  'text_out_of_hours',
-];
 const AGE_GROUPS = ['18-24', '25-34', '35-44', '45-54', '55-64', '65+', 'Unknown'];
 const GENDERS = ['Male', 'Female', 'Other', 'Prefer not to say'];
 const YES_NO = ['Yes', 'No'];
@@ -104,7 +91,6 @@ function parseStoredJson(row) {
   if (row.reasons_for_attending) row.reasons_for_attending = parseJsonArray(row.reasons_for_attending);
   if (row.support_needs) row.support_needs = parseJsonArray(row.support_needs);
   if (row.onward_referrals) row.onward_referrals = parseJsonArray(row.onward_referrals);
-  if (row.limitations_detail) row.limitations_detail = parseJsonArray(row.limitations_detail);
   return row;
 }
 
@@ -218,7 +204,6 @@ router.post('/', async (req, res, next) => {
     const reasons = enumArray(req.body.reasons_for_attending, REASONS, 'reasons_for_attending');
     const supportNeeds = enumArray(req.body.support_needs, SUPPORT_NEEDS, 'support_needs');
     const onwardReferrals = enumArray(req.body.onward_referrals, ONWARD_REFERRALS, 'onward_referrals');
-    const limitationsDetail = enumArray(req.body.limitations_detail, LIMITATIONS, 'limitations_detail');
     const staffMember = normaliseString(req.body.staff_member, 'staff_member', { max: 200 });
     const staffSignature = normaliseString(req.body.staff_signature, 'staff_signature', { max: 200 });
     const signedDate = req.body.signed_date ? parseDateString(req.body.signed_date, 'signed_date') : null;
@@ -322,7 +307,6 @@ router.post('/', async (req, res, next) => {
                 signed_date                    = ?,
                 support_needs                  = ?,
                 onward_referrals               = ?,
-                limitations_detail             = ?,
                 completed_at                   = datetime('now')
               WHERE booking_id = ?`,
         args: [
@@ -335,7 +319,6 @@ router.post('/', async (req, res, next) => {
           staffMember, staffSignature, signedDate,
           nullableJson(supportNeeds),
           nullableJson(onwardReferrals),
-          nullableJson(limitationsDetail),
           bookingId,
         ],
       });
@@ -347,8 +330,8 @@ router.post('/', async (req, res, next) => {
                 reasons_for_attending,
                 privacy_acknowledged, safety_agreement_acknowledged, confidentiality_limits_explained,
                 staff_member, staff_signature, signed_date,
-                support_needs, onward_referrals, limitations_detail
-              ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                support_needs, onward_referrals
+              ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         args: [
           bookingId, userId,
           referralSource, referredByName, referredByRole, referredByPhone, referredByEmail,
@@ -359,7 +342,6 @@ router.post('/', async (req, res, next) => {
           staffMember, staffSignature, signedDate,
           nullableJson(supportNeeds),
           nullableJson(onwardReferrals),
-          nullableJson(limitationsDetail),
         ],
       });
     }

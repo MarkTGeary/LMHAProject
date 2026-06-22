@@ -10,8 +10,7 @@ async function aggregateMetrics(location, startDate, endDate) {
       sql: `SELECT b.*,
                    i.id as intake_id,
                    i.referral_source, i.reasons_for_attending,
-                   i.support_needs, i.onward_referrals,
-                   i.limitations_detail as intake_limitations_detail
+                   i.support_needs, i.onward_referrals
             FROM bookings b
             LEFT JOIN intake_forms i ON i.booking_id = b.id
             WHERE b.location = ?
@@ -79,11 +78,9 @@ async function aggregateMetrics(location, startDate, endDate) {
   }
 
   function countLimitation(key) {
-    const fromBookings = bookings.filter(b => {
-      const fromBooking = parseJson(b.limitations_detail);
-      const fromIntake = parseJson(b.intake_limitations_detail);
-      return fromBooking.includes(key) || fromIntake.includes(key);
-    }).length;
+    const fromBookings = bookings.filter(b =>
+      parseJson(b.limitations_detail).includes(key)
+    ).length;
     const fromStandalone = standaloneLimitations.filter(r =>
       parseJson(r.limitations_detail).includes(key)
     ).length;
