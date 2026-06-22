@@ -42,13 +42,11 @@ async function aggregateMetrics(location, startDate, endDate) {
     b.interaction_type === 'Walk-In' || b.interaction_type === 'Crisis';
 
   const supportCalls = serviceBookings.filter(isSupportCall);
-  const peopleBookings = serviceBookings.filter(b =>
-    b.service_user_id && (b.outcome === 'Attended' || b.intake_id)
-  );
 
-  // Demographics come from completed intake/person records. Did-not-attend
-  // records are counted separately but must not inflate people/age/gender totals.
-  const userIds = [...new Set(peopleBookings.map(b => b.service_user_id).filter(Boolean))];
+  // Build user list from all service interactions with a known service user —
+  // not just attended/intake-complete ones — so demographics capture everyone
+  // supported and stay consistent with total_people counts.
+  const userIds = [...new Set(serviceBookings.filter(b => b.service_user_id).map(b => b.service_user_id))];
   let users = [];
   if (userIds.length) {
     const usersResult = await db.execute({
@@ -103,8 +101,8 @@ async function aggregateMetrics(location, startDate, endDate) {
     total_male:             users.filter(u => u.gender === 'Male').length,
     total_female:           users.filter(u => u.gender === 'Female').length,
     total_other_gender:     users.filter(u => u.gender === 'Prefer not to say').length,
-    total_new:              peopleBookings.filter(b => b.new_or_repeat === 'New').length,
-    total_repeat:           peopleBookings.filter(b => b.new_or_repeat === 'Repeat').length,
+    total_new:              serviceBookings.filter(b => b.new_or_repeat === 'New').length,
+    total_repeat:           serviceBookings.filter(b => b.new_or_repeat === 'Repeat').length,
     age_18_24:  users.filter(u => u.age_group === '18-24').length,
     age_25_34:  users.filter(u => u.age_group === '25-34').length,
     age_35_44:  users.filter(u => u.age_group === '35-44').length,
@@ -224,7 +222,7 @@ async function aggregateMetrics(location, startDate, endDate) {
                       limitations.lim_no_appointment_week + limitations.lim_closed_short_staff +
                       limitations.lim_calls_out_hours + limitations.lim_text_out_hours;
   limitations.lim_indv_not_facilitated = bookings.filter(b =>
-    parseJson(b.limitations_detail).length > 0
+    parseJson(b.limitations_detail).length > 0 || parseJson(b.intake_limitations_detail).length > 0
   ).length + standaloneLimitations.length;
 
   return {

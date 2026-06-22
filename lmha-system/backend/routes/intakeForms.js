@@ -274,6 +274,12 @@ router.post('/', async (req, res, next) => {
       });
     } else {
       await updateServiceUserFields(userId, serviceUserFields);
+      // Ensure the booking is linked to this service user (it may have been
+      // created without one, or via a different path).
+      await db.execute({
+        sql: 'UPDATE bookings SET service_user_id = ? WHERE id = ?',
+        args: [userId, bookingId],
+      });
     }
 
     if (ed_diversion !== undefined) {

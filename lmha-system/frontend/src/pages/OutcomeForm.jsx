@@ -63,6 +63,7 @@ export default function OutcomeForm() {
         })
         setHasIntake(!!b.intake_complete)
       })
+      .catch(() => setError('Failed to load booking. Please refresh the page.'))
       .finally(() => setLoading(false))
   }, [id, user])
 

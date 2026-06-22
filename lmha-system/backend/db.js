@@ -183,6 +183,7 @@ async function initAndMigrate() {
   await migrateAllowedEmailRoles();
   await migrateAgeGroupUnknown();
   await migrateServiceEventType();
+  await migrateWalkinServiceEventType();
 
   // ── Migration: bookings columns ───────────────────────────────────
   const bookingColsResult = await _client.execute('PRAGMA table_info(bookings)');
@@ -304,6 +305,7 @@ async function migrateAgeGroupUnknown() {
   console.log("[DB] Running migration: adding 'Unknown' to service_users.age_group...");
   // foreign_keys must be toggled outside of a transaction
   await _client.execute('PRAGMA foreign_keys = OFF');
+  try {
   await _client.executeMultiple(`
     BEGIN;
     CREATE TABLE service_users_new (
@@ -333,7 +335,9 @@ async function migrateAgeGroupUnknown() {
     CREATE INDEX IF NOT EXISTS idx_service_users_name ON service_users(full_name);
     COMMIT;
   `);
-  await _client.execute('PRAGMA foreign_keys = ON');
+  } finally {
+    await _client.execute('PRAGMA foreign_keys = ON');
+  }
   console.log("[DB] Migration complete: service_users.age_group now allows 'Unknown'.");
 }
 
@@ -367,6 +371,21 @@ async function migrateServiceEventType() {
       WHERE service_event_type IS NULL AND outcome = 'Attended';
   `);
   console.log('[DB] Migration complete: bookings.service_event_type added and backfilled.');
+}
+
+// Corrects walk-in/crisis bookings that the original service_event_type backfill
+// incorrectly classified as 'Attended through booking' (the catch-all ran before
+// checking interaction_type). Idempotent — after the first run the WHERE clause
+// no longer matches anything.
+async function migrateWalkinServiceEventType() {
+  await _client.executeMultiple(`
+    UPDATE bookings SET service_event_type = 'Walk-in crisis'
+      WHERE service_event_type = 'Attended through booking'
+        AND interaction_type = 'Crisis';
+    UPDATE bookings SET service_event_type = 'Walk-in social'
+      WHERE service_event_type = 'Attended through booking'
+        AND interaction_type = 'Walk-In';
+  `);
 }
 
 async function auditAndBackfillBookingLocks() {

@@ -61,7 +61,10 @@ router.post('/service-users/:id/erase', async (req, res, next) => {
                 referred_by_role = NULL,
                 referred_by_phone = NULL,
                 referred_by_email = NULL,
-                staff_signature = NULL
+                staff_signature = NULL,
+                reasons_for_attending = NULL,
+                support_needs = NULL,
+                onward_referrals = NULL
               WHERE service_user_id = ?`,
         args: [id],
       },
