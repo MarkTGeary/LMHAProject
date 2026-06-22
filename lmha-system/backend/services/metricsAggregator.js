@@ -76,13 +76,17 @@ async function aggregateMetrics(location, startDate, endDate) {
 
   // --- Section 1: General Service Information ---
   const s1 = {
-    // Only in-person appointments count as bookings received.
-    // Phone calls (held_over_phone or Phone Call type) and information-seeking
-    // contacts are support calls, not booked appointments.
+    // Only booked-ahead appointments count as bookings received.
+    // Walk-ins / crises were never booked, phone calls (held_over_phone or
+    // Phone Call type) and information-seeking contacts are support calls — none
+    // of these are booked appointments, but they still count toward Total People
+    // via their own event-type buckets below.
     total_bookings_received: bookings.filter(b =>
       Number(b.information_seeking) !== 1 &&
       Number(b.held_over_phone) !== 1 &&
-      b.interaction_type !== 'Phone Call'
+      b.interaction_type !== 'Phone Call' &&
+      b.interaction_type !== 'Walk-In' &&
+      b.interaction_type !== 'Crisis'
     ).length,
     // The four event types are mutually exclusive (one per attended booking)
     // so they sum cleanly into total_people below. Set in the Outcome form.
