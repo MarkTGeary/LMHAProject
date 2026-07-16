@@ -37,11 +37,20 @@ async function aggregateMetrics(location, startDate, endDate) {
 
   // Each completed interaction maps to exactly one of the four Section-1 event
   // buckets, so they stay mutually exclusive and sum cleanly into Total People.
-  // Information-seeking always wins (it's a support call) even if some other
-  // event type was set on the row.
+  // The bucket is derived from how the contact was booked (interaction_type)
+  // rather than a manual outcome-form pick, so every completed interaction is
+  // always counted. Legacy rows that recorded a service_event_type explicitly
+  // are honoured; information-seeking / phone contacts count as support calls.
   function eventBucket(b) {
     if (Number(b.information_seeking) === 1) return 'Support call';
-    return b.service_event_type || null;
+    if (b.service_event_type) return b.service_event_type;
+    if (b.interaction_type === 'Crisis') return 'Walk-in crisis';
+    if (b.interaction_type === 'Walk-In') return 'Walk-in social';
+    if (Number(b.held_over_phone) === 1 ||
+        ['Phone Call', 'Email', 'Text'].includes(b.interaction_type)) {
+      return 'Support call';
+    }
+    return 'Attended through booking';
   }
   const eventBuckets = serviceBookings.map(eventBucket);
 

@@ -34,7 +34,6 @@ export default function NewBooking({ editMode }) {
     date: '',
     time_booked: '',
     interaction_type: '',
-    information_seeking: false,
     new_or_repeat: 'New',
     referred_from: '',
     carer_attended: false,
@@ -77,7 +76,6 @@ export default function NewBooking({ editMode }) {
             date: b.date,
             time_booked: b.time_booked,
             interaction_type: b.interaction_type,
-            information_seeking: !!b.information_seeking,
             new_or_repeat: b.new_or_repeat || 'New',
             referred_from: b.referred_from || '',
             carer_attended: !!b.carer_attended,
@@ -111,19 +109,6 @@ export default function NewBooking({ editMode }) {
 
   const set = (field, value) => setForm(f => ({ ...f, [field]: value }))
 
-  const nowHHMM = () => {
-    const d = new Date()
-    return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
-  }
-
-  // Information-seeking contacts skip the slot picker — default a date/time so the record saves.
-  const setInfoSeeking = (val) => setForm(f => ({
-    ...f,
-    information_seeking: val,
-    date: val && !f.date ? new Date().toISOString().slice(0, 10) : f.date,
-    time_booked: val ? (f.time_booked || nowHHMM()) : f.time_booked,
-  }))
-
   const handleUserSelect = (user) => {
     setExistingUser(user)
     set('service_user_id', user.id)
@@ -146,7 +131,7 @@ export default function NewBooking({ editMode }) {
     if (!form.time_booked) return 'Time is required'
     if (!form.interaction_type) return 'Interaction type is required'
     if (!form.service_user_id && !form.full_name) return 'Name is required'
-    if (!form.information_seeking && sessionInfo && sessionInfo.used >= sessionInfo.max) {
+    if (sessionInfo && sessionInfo.used >= sessionInfo.max) {
       return `Session limit reached (${sessionInfo.used}/${sessionInfo.max} tonight). Contact an admin to add more.`
     }
     return null
@@ -227,14 +212,8 @@ export default function NewBooking({ editMode }) {
               value={form.date}
               onChange={e => {
                 const date = e.target.value
-                // For a normal booking the time is a slot tied to the date, so clear it.
-                // For an information-seeking call the time is entered manually (and may be
-                // backdated), so keep it — defaulting to now if it isn't set yet.
-                setForm(f => ({
-                  ...f,
-                  date,
-                  time_booked: f.information_seeking ? (f.time_booked || nowHHMM()) : '',
-                }))
+                // Time is a slot tied to the date, so clear it whenever the date changes.
+                setForm(f => ({ ...f, date, time_booked: '' }))
               }}
             />
             {dayInvalid && (
@@ -246,16 +225,6 @@ export default function NewBooking({ editMode }) {
 
           <div className="field">
             <label className="label">Time <span className="text-red-500">*</span></label>
-            {form.information_seeking ? (
-              <div>
-                <p className="text-xs text-gray-600 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 mb-2">
-                  No appointment slot needed — logged as a support call. If you're filling
-                  this in later, set the time it actually happened.
-                </p>
-                <input type="time" className="input" value={form.time_booked}
-                  onChange={e => set('time_booked', e.target.value)} step="60" />
-              </div>
-            ) : (<>
             {form.date ? (
               dayInvalid ? (
                 <div>
@@ -348,7 +317,6 @@ export default function NewBooking({ editMode }) {
                 </button>
               </div>
             )}
-            </>)}
           </div>
 
           <div className="field">
@@ -368,39 +336,6 @@ export default function NewBooking({ editMode }) {
                 </button>
               ))}
             </div>
-          </div>
-
-          <div className="field">
-            <label className="label">What kind of contact?</label>
-            <div className="grid grid-cols-2 gap-3">
-              <button
-                type="button"
-                onClick={() => setInfoSeeking(false)}
-                className={`min-h-[56px] rounded-xl border-2 font-semibold text-base transition-all ${
-                  !form.information_seeking
-                    ? 'bg-blue-600 border-blue-600 text-white'
-                    : 'bg-white border-gray-300 text-gray-700 hover:border-blue-300'
-                }`}
-              >
-                📅 Booking / Appointment
-              </button>
-              <button
-                type="button"
-                onClick={() => setInfoSeeking(true)}
-                className={`min-h-[56px] rounded-xl border-2 font-semibold text-base transition-all ${
-                  form.information_seeking
-                    ? 'bg-blue-600 border-blue-600 text-white'
-                    : 'bg-white border-gray-300 text-gray-700 hover:border-blue-300'
-                }`}
-              >
-                ℹ️ Information Seeking
-              </button>
-            </div>
-            {form.information_seeking && (
-              <p className="text-xs text-gray-500 mt-2">
-                Logged as a support call looking for information — no appointment slot or intake form needed.
-              </p>
-            )}
           </div>
 
           <div className="field">

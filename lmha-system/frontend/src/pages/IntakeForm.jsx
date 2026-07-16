@@ -176,9 +176,6 @@ export default function IntakeForm() {
   const [isRepeat, setIsRepeat] = useState(false)
   const [existingUser, setExistingUser] = useState(null)
 
-  // Whether this conversation happened over the phone rather than in person
-  const [heldOverPhone, setHeldOverPhone] = useState(false)
-
   // Page 1 — Service User Info
   const [su, setSu] = useState({
     full_name: '', phone: '', email: '',
@@ -235,7 +232,6 @@ export default function IntakeForm() {
     ]).then(([b, intake]) => {
       setBooking(b)
       setIsLocked(isBookingLocked(b.date, user?.isAdmin))
-      setHeldOverPhone(!!b.held_over_phone)
       if (b.full_name) setSu(prev => ({ ...prev, full_name: b.full_name, phone: b.phone || '' }))
       if (b.new_or_repeat === 'Repeat') setIsRepeat(true)
       if (intake) {
@@ -307,7 +303,6 @@ export default function IntakeForm() {
       service_user_id: booking?.service_user_id || null,
       is_repeat: isRepeat,
       existing_user_id: existingUser?.id || booking?.service_user_id || null,
-      held_over_phone: heldOverPhone,
       ...su,
       ...p2,
     }
@@ -423,20 +418,6 @@ export default function IntakeForm() {
             )}
           </div>
 
-          <div className="card">
-            <label className="flex items-center gap-3 cursor-pointer">
-              <div
-                onClick={() => setHeldOverPhone(v => !v)}
-                className={`w-14 h-8 rounded-full transition-colors flex items-center px-1 ${heldOverPhone ? 'bg-blue-600' : 'bg-gray-300'}`}
-              >
-                <div className={`w-6 h-6 bg-white rounded-full shadow transition-transform ${heldOverPhone ? 'translate-x-6' : 'translate-x-0'}`} />
-              </div>
-              <span className="text-base font-semibold text-gray-700">📞 Conversation held over phone (not in person)</span>
-            </label>
-            <p className="text-xs text-gray-500 mt-2">
-              Records this as a support call rather than an in-person attendance.
-            </p>
-          </div>
 
           <div className="card">
                 <h2 className="text-xl font-bold mb-4">Personal Information</h2>
