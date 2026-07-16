@@ -37,6 +37,7 @@ export default function NewBooking({ editMode }) {
     new_or_repeat: 'New',
     referred_from: '',
     carer_attended: false,
+    preceded_by_call: false,
     notes: '',
     full_name: '',
     phone: '',
@@ -79,6 +80,7 @@ export default function NewBooking({ editMode }) {
             new_or_repeat: b.new_or_repeat || 'New',
             referred_from: b.referred_from || '',
             carer_attended: !!b.carer_attended,
+            preceded_by_call: !!b.preceded_by_call,
             notes: b.notes || '',
             full_name: b.full_name || '',
             phone: b.phone || '',
@@ -421,6 +423,21 @@ export default function NewBooking({ editMode }) {
               <span className="text-base font-semibold text-gray-700">Carer / Family Member Attending</span>
             </label>
           </div>
+
+          {form.interaction_type && form.interaction_type !== 'Phone Call' && (
+            <div className="field">
+              <label className="flex items-center gap-3 cursor-pointer">
+                <div
+                  onClick={() => set('preceded_by_call', !form.preceded_by_call)}
+                  className={`w-14 h-8 rounded-full transition-colors flex items-center px-1 ${form.preceded_by_call ? 'bg-blue-600' : 'bg-gray-300'}`}
+                >
+                  <div className={`w-6 h-6 bg-white rounded-full shadow transition-transform ${form.preceded_by_call ? 'translate-x-6' : 'translate-x-0'}`} />
+                </div>
+                <span className="text-base font-semibold text-gray-700">Client phoned ahead earlier today</span>
+              </label>
+              <p className="text-sm text-gray-500 mt-1 ml-1">Counts this booking as both a support call and an attended booking — no need to log the call separately.</p>
+            </div>
+          )}
 
           <div className="field">
             <label className="label">Notes</label>

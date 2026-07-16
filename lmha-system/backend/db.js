@@ -209,6 +209,11 @@ async function initAndMigrate() {
     await _client.execute('ALTER TABLE bookings ADD COLUMN held_over_phone INTEGER DEFAULT 0');
     console.log('[DB] Migration complete: bookings.held_over_phone added.');
   }
+  if (!bookingCols.includes('preceded_by_call')) {
+    console.log('[DB] Running migration: adding bookings.preceded_by_call...');
+    await _client.execute('ALTER TABLE bookings ADD COLUMN preceded_by_call INTEGER DEFAULT 0');
+    console.log('[DB] Migration complete: bookings.preceded_by_call added.');
+  }
 
   // ── Migration: booking_slot_locks → per-worker PK ────────────────
   const slotLockColsResult = await _client.execute('PRAGMA table_info(booking_slot_locks)');

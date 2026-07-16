@@ -54,6 +54,15 @@ async function aggregateMetrics(location, startDate, endDate) {
   }
   const eventBuckets = serviceBookings.map(eventBucket);
 
+  // A client who phones ahead and then attends in person that same day is both
+  // a support call and an attended booking, but is stored as a single row
+  // (preceded_by_call) so staff don't have to enter it twice. Add the call on
+  // top of the row's normal bucket rather than re-bucketing it, so
+  // total_bookings_received / the four buckets above stay untouched.
+  const precededByCallExtra = serviceBookings.filter(b =>
+    Number(b.preceded_by_call) === 1 && eventBucket(b) !== 'Support call'
+  ).length;
+
   // Build user list from all service interactions with a known service user —
   // not just attended/intake-complete ones — so demographics capture everyone
   // supported and stay consistent with total_people counts.
@@ -114,7 +123,7 @@ async function aggregateMetrics(location, startDate, endDate) {
     // via eventBucket) so they sum cleanly into total_people below.
     total_attendees_through_bookings: eventBuckets.filter(t => t === 'Attended through booking').length,
     total_walk_in_crisis:             eventBuckets.filter(t => t === 'Walk-in crisis').length,
-    total_support_calls:              eventBuckets.filter(t => t === 'Support call').length,
+    total_support_calls:              eventBuckets.filter(t => t === 'Support call').length + precededByCallExtra,
     total_walk_in_social:             eventBuckets.filter(t => t === 'Walk-in social').length,
     total_dna:              dna.length,
     total_carer_attendees:  bookings.filter(b => b.carer_attended).length,
@@ -134,6 +143,8 @@ async function aggregateMetrics(location, startDate, endDate) {
     age_unknown: users.filter(u => u.age_group === 'Unknown' || !u.age_group).length,
   };
   // Total People supported = sum of the four mutually-exclusive event types.
+  // total_support_calls already folds in precededByCallExtra, so a phone-then-
+  // in-person row correctly adds one attendee AND one call to this total.
   s1.total_people = s1.total_attendees_through_bookings + s1.total_support_calls +
                     s1.total_walk_in_crisis + s1.total_walk_in_social;
 

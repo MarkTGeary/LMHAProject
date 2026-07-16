@@ -298,6 +298,7 @@ router.post('/', async (req, res, next) => {
     const assigned_to = req.body.assigned_to ? normaliseString(req.body.assigned_to, 'assigned_to', { max: 200 }) : null;
     const information_seeking = booleanInt(req.body.information_seeking ?? false, 'information_seeking');
     const held_over_phone = booleanInt(req.body.held_over_phone ?? false, 'held_over_phone');
+    const preceded_by_call = booleanInt(req.body.preceded_by_call ?? false, 'preceded_by_call');
 
     const timeValid = validateBookingTime(location, date, time_booked);
     if (!timeValid.valid) return res.status(400).json({ error: timeValid.error });
@@ -340,7 +341,7 @@ router.post('/', async (req, res, next) => {
       location, date, time_booked, interaction_type,
       new_or_repeat, referred_from, type_of_support, carer_attended,
       peer_support_worker, limitations, limitations_detail, notes, outcome, req.user.email, assigned_to,
-      information_seeking, held_over_phone, service_event_type_auto,
+      information_seeking, held_over_phone, service_event_type_auto, preceded_by_call,
     ];
     const serviceUserSql = serviceUserId ? '?' : 'last_insert_rowid()';
     if (serviceUserId) bookingArgs.unshift(serviceUserId);
@@ -351,8 +352,8 @@ router.post('/', async (req, res, next) => {
               service_user_id, location, date, time_booked, interaction_type,
               new_or_repeat, referred_from, type_of_support, carer_attended,
               peer_support_worker, limitations, limitations_detail, notes, outcome, status, created_by, assigned_to,
-              information_seeking, held_over_phone, service_event_type
-            ) VALUES (${serviceUserSql}, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Active', ?, ?, ?, ?, ?)`,
+              information_seeking, held_over_phone, service_event_type, preceded_by_call
+            ) VALUES (${serviceUserSql}, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Active', ?, ?, ?, ?, ?, ?)`,
       args: bookingArgs,
     });
     if (!skipSlotLock) {
@@ -417,6 +418,7 @@ router.patch('/:id', async (req, res, next) => {
     if (hasOwn(req.body, 'assigned_to')) values.assigned_to = req.body.assigned_to ? normaliseString(req.body.assigned_to, 'assigned_to', { max: 200 }) : null;
     if (hasOwn(req.body, 'information_seeking')) values.information_seeking = booleanInt(req.body.information_seeking, 'information_seeking');
     if (hasOwn(req.body, 'held_over_phone')) values.held_over_phone = booleanInt(req.body.held_over_phone, 'held_over_phone');
+    if (hasOwn(req.body, 'preceded_by_call')) values.preceded_by_call = booleanInt(req.body.preceded_by_call, 'preceded_by_call');
 
     const newDate = values.date ?? existing.date;
     const newTime = values.time_booked ?? existing.time_booked;

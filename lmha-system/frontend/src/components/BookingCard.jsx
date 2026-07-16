@@ -61,6 +61,11 @@ export default function BookingCard({ booking }) {
             📞 By phone
           </span>
         ) : null}
+        {!isInfoSeeking && booking.preceded_by_call ? (
+          <span className="text-sm bg-sky-100 text-sky-700 rounded-lg px-3 py-1 font-medium">
+            📞 Called ahead
+          </span>
+        ) : null}
         {booking.new_or_repeat && (
           <span className={`text-sm rounded-lg px-3 py-1 font-medium ${booking.new_or_repeat === 'New' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'}`}>
             {booking.new_or_repeat}
