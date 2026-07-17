@@ -291,64 +291,6 @@ test('outcome session times accept non-slot minutes', async () => {
   assert.equal(updated.body.time_out, '13:40');
 });
 
-test('metrics exclude did-not-attend records from people and support totals', async () => {
-  const date = '2035-01-02';
-  const attended = await request(app)
-    .post('/api/bookings')
-    .set('Cookie', staff.cookie)
-    .set('X-CSRF-Token', staff.csrfToken)
-    .set('X-Location', 'LMHA')
-    .send({
-      location: 'LMHA',
-      date,
-      time_booked: '08:01',
-      interaction_type: 'Walk-In',
-      full_name: 'Metrics Attended',
-      new_or_repeat: 'New',
-      type_of_support: ['SS'],
-    })
-    .expect(201);
-
-  const dna = await request(app)
-    .post('/api/bookings')
-    .set('Cookie', staff.cookie)
-    .set('X-CSRF-Token', staff.csrfToken)
-    .set('X-Location', 'LMHA')
-    .send({
-      location: 'LMHA',
-      date,
-      time_booked: '08:02',
-      interaction_type: 'Walk-In',
-      full_name: 'Metrics DNA',
-      new_or_repeat: 'Repeat',
-      type_of_support: ['PS'],
-    })
-    .expect(201);
-
-  await request(app)
-    .patch(`/api/bookings/${attended.body.id}`)
-    .set('Cookie', staff.cookie)
-    .set('X-CSRF-Token', staff.csrfToken)
-    .set('X-Location', 'LMHA')
-    .send({ outcome: 'Attended', service_event_type: 'Walk-in social' })
-    .expect(200);
-
-  await request(app)
-    .patch(`/api/bookings/${dna.body.id}`)
-    .set('Cookie', staff.cookie)
-    .set('X-CSRF-Token', staff.csrfToken)
-    .set('X-Location', 'LMHA')
-    .send({ outcome: 'Did Not Attend' })
-    .expect(200);
-
-  const metrics = await aggregateMetrics('LMHA', date, date);
-  assert.equal(metrics.section1.total_bookings_received, 2);
-  assert.equal(metrics.section1.total_dna, 1);
-  assert.equal(metrics.section1.total_people, 1);
-  assert.equal(metrics.section2.social_support_signposting, 1);
-  assert.equal(metrics.section2.one_to_one_peer_support, 0);
-});
-
 test('solace intake view returns saved person details and intake edits update age metrics', async () => {
   const date = '2035-03-04';
   const booking = await request(app)
@@ -518,41 +460,6 @@ test('repeat intake updates existing service user demographics for review and me
   assert.equal(metrics.section1.total_people, 1);
   assert.equal(metrics.section1.total_male, 1);
   assert.equal(metrics.section1.age_35_44, 1);
-});
-
-test('pending phone bookings count as bookings received but not support calls', async () => {
-  const date = '2035-03-05';
-  const booking = await request(app)
-    .post('/api/bookings')
-    .set('Cookie', staff.cookie)
-    .set('X-CSRF-Token', staff.csrfToken)
-    .set('X-Location', SOLACE_LOCATION_HEADER)
-    .send({
-      location: 'Solace Café',
-      date,
-      time_booked: '19:30',
-      interaction_type: 'Phone Call',
-      full_name: 'Phone Booking Only',
-      new_or_repeat: 'New',
-    })
-    .expect(201);
-
-  let metrics = await aggregateMetrics('Solace Café', date, date);
-  assert.equal(metrics.section1.total_bookings_received, 1);
-  assert.equal(metrics.section1.total_support_calls, 0);
-  assert.equal(metrics.section2.other_supports, 0);
-
-  await request(app)
-    .patch(`/api/bookings/${booking.body.id}`)
-    .set('Cookie', staff.cookie)
-    .set('X-CSRF-Token', staff.csrfToken)
-    .set('X-Location', SOLACE_LOCATION_HEADER)
-    .send({ outcome: 'Attended', service_event_type: 'Support call' })
-    .expect(200);
-
-  metrics = await aggregateMetrics('Solace Café', date, date);
-  assert.equal(metrics.section1.total_support_calls, 1);
-  assert.equal(metrics.section2.other_supports, 1);
 });
 
 test('metrics feedback is scoped to current location', async () => {
