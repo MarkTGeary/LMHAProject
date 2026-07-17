@@ -59,9 +59,10 @@ async function aggregateMetrics(location, startDate, endDate) {
   // (preceded_by_call) so staff don't have to enter it twice. Add the call on
   // top of the row's normal bucket rather than re-bucketing it, so
   // total_bookings_received / the four buckets above stay untouched.
-  const precededByCallExtra = serviceBookings.filter(b =>
+  const precededByCallRows = serviceBookings.filter(b =>
     Number(b.preceded_by_call) === 1 && eventBucket(b) !== 'Support call'
-  ).length;
+  );
+  const precededByCallExtra = precededByCallRows.length;
 
   // Build user list from all service interactions with a known service user —
   // not just attended/intake-complete ones — so demographics capture everyone
@@ -75,6 +76,19 @@ async function aggregateMetrics(location, startDate, endDate) {
     });
     users = usersResult.rows;
   }
+
+  // Gender/age totals are meant to reconcile with total_people (see comment
+  // above), so a preceded_by_call row's person needs to be counted a second
+  // time here too — once as the deduped attendee, once more for the earlier
+  // call — same as total_support_calls above.
+  const userById = new Map(users.map(u => [u.id, u]));
+  const demographicEntries = [
+    ...users,
+    ...precededByCallRows
+      .filter(b => b.service_user_id)
+      .map(b => userById.get(b.service_user_id))
+      .filter(Boolean),
+  ];
 
   // --- Helpers ---
 
@@ -127,20 +141,23 @@ async function aggregateMetrics(location, startDate, endDate) {
     total_walk_in_social:             eventBuckets.filter(t => t === 'Walk-in social').length,
     total_dna:              dna.length,
     total_carer_attendees:  bookings.filter(b => b.carer_attended).length,
-    total_male:             users.filter(u => u.gender === 'Male').length,
-    total_female:           users.filter(u => u.gender === 'Female').length,
-    total_other_gender:     users.filter(u => u.gender === 'Prefer not to say' || u.gender === 'Other').length,
+    total_male:             demographicEntries.filter(u => u.gender === 'Male').length,
+    total_female:           demographicEntries.filter(u => u.gender === 'Female').length,
+    total_other_gender:     demographicEntries.filter(u => u.gender === 'Prefer not to say' || u.gender === 'Other').length,
+    // Not doubled for preceded_by_call rows like demographics/support_calls are —
+    // New/Repeat classifies the in-person attendee, and the earlier call isn't
+    // an attendee, so it doesn't get its own New/Repeat count.
     total_new:              serviceBookings.filter(b => b.new_or_repeat === 'New').length,
     total_repeat:           serviceBookings.filter(b => b.new_or_repeat === 'Repeat').length,
-    age_18_24:  users.filter(u => u.age_group === '18-24').length,
-    age_25_34:  users.filter(u => u.age_group === '25-34').length,
-    age_35_44:  users.filter(u => u.age_group === '35-44').length,
-    age_45_54:  users.filter(u => u.age_group === '45-54').length,
-    age_55_64:  users.filter(u => u.age_group === '55-64').length,
-    age_65_plus: users.filter(u => u.age_group === '65+').length,
+    age_18_24:  demographicEntries.filter(u => u.age_group === '18-24').length,
+    age_25_34:  demographicEntries.filter(u => u.age_group === '25-34').length,
+    age_35_44:  demographicEntries.filter(u => u.age_group === '35-44').length,
+    age_45_54:  demographicEntries.filter(u => u.age_group === '45-54').length,
+    age_55_64:  demographicEntries.filter(u => u.age_group === '55-64').length,
+    age_65_plus: demographicEntries.filter(u => u.age_group === '65+').length,
     // Walk-ins / info-calls often create a service_user with no recorded age, so
     // treat NULL/blank the same as an explicit 'Unknown' to avoid undercounting.
-    age_unknown: users.filter(u => u.age_group === 'Unknown' || !u.age_group).length,
+    age_unknown: demographicEntries.filter(u => u.age_group === 'Unknown' || !u.age_group).length,
   };
   // Total People supported = sum of the four mutually-exclusive event types.
   // total_support_calls already folds in precededByCallExtra, so a phone-then-
