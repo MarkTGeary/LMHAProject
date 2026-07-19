@@ -435,7 +435,7 @@ export default function NewBooking({ editMode }) {
                 </div>
                 <span className="text-base font-semibold text-gray-700">Client phoned ahead earlier today</span>
               </label>
-              <p className="text-sm text-gray-500 mt-1 ml-1">Counts this booking as both a support call and an attended booking — no need to log the call separately.</p>
+              <p className="text-sm text-gray-500 mt-1 ml-1">Adds both this booking and the support call to the metrics.</p>
             </div>
           )}
 
