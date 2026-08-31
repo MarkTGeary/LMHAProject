@@ -5,7 +5,7 @@ import { useAuth } from '../App'
 import RepeatUserSearch from '../components/RepeatUserSearch'
 
 export default function Settings() {
-  const { user } = useAuth()
+  const { user, theme, setTheme } = useAuth()
   const [emails, setEmails] = useState([])
   const [protectedEmail, setProtectedEmail] = useState('')
   const [newEmail, setNewEmail] = useState('')
@@ -101,6 +101,36 @@ export default function Settings() {
   return (
     <Layout title="Settings">
       <div className="space-y-6 pb-10 max-w-xl">
+
+        <div className="card">
+          <h2 className="text-xl font-bold mb-1">Appearance</h2>
+          <p className="text-sm text-gray-500 mb-5">
+            Choose how LMHA looks on this device.
+          </p>
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <div className="font-semibold text-gray-800">Dark mode</div>
+              <div className="text-sm text-gray-500">Use darker colours in low-light environments.</div>
+            </div>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={theme === 'dark'}
+              aria-label="Dark mode"
+              onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+              className={`relative inline-flex h-8 w-14 shrink-0 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
+                theme === 'dark' ? 'bg-blue-600' : 'bg-gray-300'
+              }`}
+            >
+              <span
+                aria-hidden="true"
+                className={`theme-toggle-thumb inline-block h-6 w-6 rounded-full shadow-sm transition-transform ${
+                  theme === 'dark' ? 'translate-x-7' : 'translate-x-1'
+                }`}
+              />
+            </button>
+          </div>
+        </div>
 
         <div className="card">
           <h2 className="text-xl font-bold mb-1">Account Access</h2>

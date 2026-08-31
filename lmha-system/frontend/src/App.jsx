@@ -105,6 +105,13 @@ export default function App() {
   const [location, setLocation] = useState(null)
   const [loading, setLoading] = useState(true)
   const [authError, setAuthError] = useState('')
+  const [theme, setTheme] = useState(() => localStorage.getItem('lmha_theme') === 'dark' ? 'dark' : 'light')
+
+  useEffect(() => {
+    document.documentElement.classList.toggle('dark', theme === 'dark')
+    document.documentElement.style.colorScheme = theme
+    localStorage.setItem('lmha_theme', theme)
+  }, [theme])
 
   useEffect(() => {
     let cancelled = false
@@ -180,7 +187,7 @@ export default function App() {
   }
 
   return (
-    <AuthContext.Provider value={{ user, setUser, location, setLocation, loading, authError, logout }}>
+    <AuthContext.Provider value={{ user, setUser, location, setLocation, loading, authError, logout, theme, setTheme }}>
       <BrowserRouter>
         <Routes>
           <Route path="/login" element={<Login />} />
