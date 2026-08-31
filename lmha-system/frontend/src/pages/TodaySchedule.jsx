@@ -25,14 +25,14 @@ function timeToMins(t) {
 }
 
 function getColor(b) {
-  if (b.status === 'Cancelled') return 'bg-red-200 border-red-300 text-red-800'
-  if (b.status === 'Closed')    return 'bg-gray-300 border-gray-400 text-gray-700'
-  if (!b.intake_complete)       return 'bg-orange-400 border-orange-500 text-white'
-  return 'bg-blue-500 border-blue-600 text-white'
+  if (b.status === 'Cancelled') return 'bg-red-50 border-red-300 border-l-red-500 text-red-800'
+  if (b.status === 'Closed')    return 'bg-gray-100 border-gray-300 border-l-gray-500 text-gray-700'
+  if (!b.intake_complete)       return 'bg-orange-50 border-orange-300 border-l-orange-500 text-orange-900'
+  return 'bg-blue-50 border-blue-300 border-l-blue-600 text-blue-900'
 }
 
 function DailyScheduleGrid({ bookings, date, hours, breakPeriods, selected, onSelect, todayStr }) {
-  const ROW_PX = 68
+  const ROW_PX = 56
   const startMins = hours.start * 60
   const hourCount = hours.end - hours.start
   const gridHeight = hourCount * ROW_PX
@@ -54,13 +54,13 @@ function DailyScheduleGrid({ bookings, date, hours, breakPeriods, selected, onSe
   return (
     <div className="card p-0 overflow-hidden">
       <div className="overflow-x-auto">
-        <div style={{ minWidth: (lanes.length * 190 + 60) + 'px' }}>
+        <div style={{ minWidth: (lanes.length * 168 + 54) + 'px' }}>
           <div className="flex border-b-2 border-gray-200 bg-gray-50 sticky top-0 z-30">
-            <div className="shrink-0 border-r border-gray-200" style={{ width: 60 }} />
+            <div className="shrink-0 border-r border-gray-200" style={{ width: 54 }} />
             {lanes.map(worker => {
               const laneCount = dayBookings.filter(b => worker ? b.assigned_to === worker : !b.assigned_to).length
               return (
-                <div key={worker || 'unassigned'} className="flex-1 min-w-[190px] border-l border-gray-200 px-3 py-2 text-center">
+                <div key={worker || 'unassigned'} className="flex-1 min-w-[168px] border-l border-gray-200 px-2 py-1.5 text-center">
                   <div className={'font-bold text-sm truncate ' + (worker ? 'text-gray-800' : 'text-amber-700')}>
                     {worker ? worker.split('@')[0] : 'Unassigned'}
                   </div>
@@ -71,7 +71,7 @@ function DailyScheduleGrid({ bookings, date, hours, breakPeriods, selected, onSe
           </div>
 
           <div className="flex" style={{ height: gridHeight }}>
-            <div className="shrink-0 relative border-r border-gray-200" style={{ width: 60 }}>
+            <div className="shrink-0 relative border-r border-gray-200" style={{ width: 54 }}>
               {hourLabels.map((label, i) => (
                 <div key={label} className="absolute w-full" style={{ top: i * ROW_PX - 9 }}>
                   <span className="block text-right pr-2 text-xs text-gray-400">{label}</span>
@@ -87,7 +87,7 @@ function DailyScheduleGrid({ bookings, date, hours, breakPeriods, selected, onSe
                 groups[b.time_booked].push(b)
               })
               return (
-                <div key={worker || 'unassigned'} className="flex-1 min-w-[190px] relative border-l border-gray-200" style={{ height: gridHeight }}>
+                <div key={worker || 'unassigned'} className="flex-1 min-w-[168px] relative border-l border-gray-200" style={{ height: gridHeight }}>
                   {hourLabels.map((_, i) => (
                     <div key={i} className="absolute w-full border-t border-gray-100" style={{ top: i * ROW_PX }} />
                   ))}
@@ -116,7 +116,7 @@ function DailyScheduleGrid({ bookings, date, hours, breakPeriods, selected, onSe
                       <button
                         key={b.id}
                         onClick={() => onSelect(isSelected ? null : b)}
-                        className={'absolute rounded-lg border text-left px-2 py-1 overflow-hidden hover:brightness-90 z-20 ' + getColor(b) + (isSelected ? ' ring-2 ring-yellow-300 ring-offset-1' : '')}
+                        className={'absolute rounded-md border border-l-4 text-left px-2 py-1 overflow-hidden hover:shadow-sm z-20 transition-shadow ' + getColor(b) + (isSelected ? ' ring-2 ring-blue-400 ring-offset-1' : '')}
                         style={{
                           top: ((timeToMins(b.time_booked) - startMins) / 60) * ROW_PX + 2,
                           height: ROW_PX - 4,
@@ -214,7 +214,7 @@ export default function WeeklySchedule() {
     byDate[b.date].push(b)
   })
 
-  const ROW_PX    = 68
+  const ROW_PX    = 56
   const hourCount = hours.end - hours.start
   const GRID_H    = hourCount * ROW_PX
   const startMins = hours.start * 60
@@ -245,49 +245,49 @@ export default function WeeklySchedule() {
       <div className="space-y-4 pb-10">
 
         <div className="flex justify-end">
-          <div className="inline-flex rounded-lg border border-gray-300 bg-gray-100 p-1" role="group" aria-label="Schedule view">
+          <div className="inline-flex rounded-lg border border-gray-200 bg-gray-100 p-0.5" role="group" aria-label="Schedule view">
             <button
               type="button"
               onClick={() => setScheduleView('week')}
-              className={'min-w-[88px] rounded-md px-4 py-2 text-sm font-semibold ' + (scheduleView === 'week' ? 'bg-white text-blue-700 shadow-sm' : 'text-gray-600 hover:text-gray-900')}
+              className={'min-w-[76px] rounded-md px-3 py-1.5 text-sm font-semibold ' + (scheduleView === 'week' ? 'bg-white text-blue-700 shadow-sm' : 'text-gray-600 hover:text-gray-900')}
             >
               Week
             </button>
             <button
               type="button"
               onClick={() => setScheduleView('day')}
-              className={'min-w-[88px] rounded-md px-4 py-2 text-sm font-semibold ' + (scheduleView === 'day' ? 'bg-white text-blue-700 shadow-sm' : 'text-gray-600 hover:text-gray-900')}
+              className={'min-w-[76px] rounded-md px-3 py-1.5 text-sm font-semibold ' + (scheduleView === 'day' ? 'bg-white text-blue-700 shadow-sm' : 'text-gray-600 hover:text-gray-900')}
             >
               Day
             </button>
           </div>
         </div>
 
-        <div className="card p-3 flex items-center gap-3">
-          <button onClick={prevWeek} className="btn-secondary btn-sm px-4">Prev</button>
-          <div className="flex-1 text-center font-bold">{weekLabel}</div>
-          <button onClick={nextWeek} className="btn-secondary btn-sm px-4">Next</button>
-          <button onClick={goToday} className="btn-primary btn-sm">Today</button>
+        <div className="card p-2 flex items-center gap-2">
+          <button onClick={prevWeek} className="rounded-md bg-gray-100 hover:bg-gray-200 px-3 py-2 text-sm font-semibold text-gray-700">Prev</button>
+          <div className="flex-1 text-center text-sm font-bold text-gray-700">{weekLabel}</div>
+          <button onClick={nextWeek} className="rounded-md bg-gray-100 hover:bg-gray-200 px-3 py-2 text-sm font-semibold text-gray-700">Next</button>
+          <button onClick={goToday} className="rounded-md bg-blue-600 hover:bg-blue-700 px-3 py-2 text-sm font-semibold text-white">Today</button>
         </div>
 
-        <div className="card p-3 flex flex-wrap items-center gap-2">
+        <div className="card p-2 flex flex-wrap items-center gap-1.5">
           <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide shrink-0">Schedule:</span>
           <button
             onClick={() => setViewFilter('mine')}
-            className={'btn-sm ' + (viewFilter === 'mine' ? 'btn-primary' : 'btn-secondary')}
+            className={'rounded-md px-3 py-1.5 text-sm font-semibold ' + (viewFilter === 'mine' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200')}
           >
             Mine
           </button>
           <button
             onClick={() => setViewFilter('all')}
-            className={'btn-sm ' + (viewFilter === 'all' ? 'btn-primary' : 'btn-secondary')}
+            className={'rounded-md px-3 py-1.5 text-sm font-semibold ' + (viewFilter === 'all' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200')}
           >
             All
           </button>
           {hasUnassigned && (
             <button
               onClick={() => setViewFilter('unassigned')}
-              className={'btn-sm ' + (viewFilter === 'unassigned' ? 'btn-primary' : 'btn-secondary')}
+              className={'rounded-md px-3 py-1.5 text-sm font-semibold ' + (viewFilter === 'unassigned' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200')}
             >
               Unassigned
             </button>
@@ -296,7 +296,7 @@ export default function WeeklySchedule() {
             <button
               key={w}
               onClick={() => setViewFilter(w)}
-              className={'btn-sm ' + (viewFilter === w ? 'btn-primary' : 'btn-secondary')}
+              className={'rounded-md px-3 py-1.5 text-sm font-semibold ' + (viewFilter === w ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200')}
             >
               {w.split('@')[0]}
             </button>
@@ -304,13 +304,13 @@ export default function WeeklySchedule() {
         </div>
 
         <div className="flex flex-wrap gap-3 text-sm px-1">
-          <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-blue-500 inline-block" /> Active</span>
-          <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-orange-400 inline-block" /> No intake</span>
-          <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-gray-400 inline-block" /> Closed</span>
+          <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm bg-blue-600 inline-block" /> Active</span>
+          <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm bg-orange-500 inline-block" /> No intake</span>
+          <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm bg-gray-500 inline-block" /> Closed</span>
         </div>
 
         {scheduleView === 'day' && (
-          <div className="card p-2 flex gap-2 overflow-x-auto">
+          <div className="card p-1.5 flex gap-1.5 overflow-x-auto">
             {visibleDays.map(d => {
               const date = fmt(d)
               const count = (byDate[date] || []).length
@@ -319,10 +319,10 @@ export default function WeeklySchedule() {
                   key={date}
                   type="button"
                   onClick={() => { setSelectedDay(date); setSelected(null) }}
-                  className={'min-w-[92px] rounded-md px-3 py-2 text-center border ' + (selectedDay === date ? 'bg-blue-600 border-blue-600 text-white' : 'bg-white border-gray-200 text-gray-700 hover:border-blue-300')}
+                  className={'min-w-[78px] rounded-md px-2 py-1.5 text-center border ' + (selectedDay === date ? 'bg-blue-600 border-blue-600 text-white' : 'bg-white border-gray-200 text-gray-700 hover:border-blue-300')}
                 >
                   <span className="block text-xs font-semibold uppercase">{DAY_NAMES[d.getDay()]}</span>
-                  <span className="block text-lg font-bold">{d.getDate()}</span>
+                  <span className="block text-base font-bold leading-tight">{d.getDate()}</span>
                   <span className={'block text-xs ' + (selectedDay === date ? 'text-blue-100' : 'text-gray-400')}>{count} booked</span>
                 </button>
               )
@@ -345,7 +345,7 @@ export default function WeeklySchedule() {
         ) : (
           <div className="card p-0 overflow-hidden">
             <div className="overflow-x-auto">
-              <div style={{ minWidth: (visibleDays.length * 130 + 52) + 'px' }}>
+              <div style={{ minWidth: (visibleDays.length * 115 + 52) + 'px' }}>
 
                 <div className="flex border-b-2 border-gray-200 bg-gray-50">
                   <div className="shrink-0 border-r border-gray-200" style={{ width: 52 }} />
@@ -354,11 +354,11 @@ export default function WeeklySchedule() {
                     const isToday = ds === todayStr
                     const count = (byDate[ds] || []).length
                     return (
-                      <div key={ds} className={'flex-1 text-center py-2 px-1 border-l border-gray-200' + (isToday ? ' bg-blue-50' : '')}>
+                      <div key={ds} className={'flex-1 text-center py-1.5 px-1 border-l border-gray-200' + (isToday ? ' bg-blue-50' : '')}>
                         <div className={'text-xs font-bold uppercase tracking-widest ' + (isToday ? 'text-blue-600' : 'text-gray-400')}>
                           {DAY_NAMES[d.getDay()]}
                         </div>
-                        <div className={'text-2xl font-bold ' + (isToday ? 'text-blue-700' : 'text-gray-800')}>
+                        <div className={'text-lg font-bold leading-tight ' + (isToday ? 'text-blue-700' : 'text-gray-800')}>
                           {d.getDate()}
                         </div>
                         <div className={'text-xs mt-0.5 ' + (count > 0 ? 'text-blue-600 font-semibold' : 'text-gray-300')}>
@@ -427,7 +427,7 @@ export default function WeeklySchedule() {
                             return (
                               <button key={b.id}
                                 onClick={() => setSelected(isSel ? null : b)}
-                                className={'absolute rounded-lg border text-left px-1.5 py-1 overflow-hidden hover:brightness-90 z-10 ' + getColor(b) + (isSel ? ' ring-2 ring-yellow-300 ring-offset-1' : '')}
+                                className={'absolute rounded-md border border-l-4 text-left px-1.5 py-1 overflow-hidden hover:shadow-sm z-10 transition-shadow ' + getColor(b) + (isSel ? ' ring-2 ring-blue-400 ring-offset-1' : '')}
                                 style={{
                                   top: topPx,
                                   height: ROW_PX - 4,
