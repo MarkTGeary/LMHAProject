@@ -344,10 +344,10 @@ export default function WeeklySchedule() {
                           const heightPx = ((timeToMins(bp.end) - timeToMins(bp.start)) / 60) * ROW_PX
                           return (
                             <div key={i}
-                              className="absolute inset-x-0 bg-gray-200/70 border-y border-dashed border-gray-300 z-10 pointer-events-none flex items-center justify-center"
+                              className="absolute inset-x-0 bg-gray-200/70 border-y border-dashed border-gray-300 dark:bg-gray-700/90 dark:border-gray-500 z-10 pointer-events-none flex items-center justify-center"
                               style={{ top: topPx, height: heightPx }}
                             >
-                              <span className="text-xs text-gray-400 font-medium">break</span>
+                              <span className="text-xs text-gray-500 dark:text-gray-100 font-semibold uppercase tracking-wide">Break</span>
                             </div>
                           )
                         })}
