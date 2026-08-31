@@ -31,115 +31,63 @@ function getColor(b) {
   return 'bg-blue-50 border-blue-300 border-l-blue-600 text-blue-900'
 }
 
-function DailyScheduleGrid({ bookings, date, hours, breakPeriods, selected, onSelect, todayStr }) {
-  const ROW_PX = 56
-  const startMins = hours.start * 60
-  const hourCount = hours.end - hours.start
-  const gridHeight = hourCount * ROW_PX
+function DailyScheduleGrid({ bookings, date, selected, onSelect }) {
   const dayBookings = bookings.filter(b => b.date === date)
-  const assignedWorkers = [...new Set(dayBookings.map(b => b.assigned_to).filter(Boolean))].sort()
-  const lanes = [null, ...assignedWorkers]
-  const hourLabels = Array.from({ length: hourCount + 1 }, (_, i) => {
-    const h = hours.start + i
-    return h >= 24 ? '00:00' : String(h).padStart(2, '0') + ':00'
-  })
-  const nowTop = (() => {
-    if (date !== todayStr) return null
-    const now = new Date()
-    const minutes = now.getHours() * 60 + now.getMinutes()
-    if (minutes < startMins || minutes > hours.end * 60) return null
-    return ((minutes - startMins) / 60) * ROW_PX
-  })()
+  const byTime = dayBookings.reduce((groups, booking) => {
+    if (!groups[booking.time_booked]) groups[booking.time_booked] = []
+    groups[booking.time_booked].push(booking)
+    return groups
+  }, {})
+  const times = Object.keys(byTime).sort((a, b) => timeToMins(a) - timeToMins(b))
+
+  if (times.length === 0) {
+    return (
+      <div className="card py-10 text-center">
+        <div className="text-gray-500">No bookings for this day</div>
+        <Link to="/bookings/new" className="btn-primary btn-sm mt-3 inline-flex">New Booking</Link>
+      </div>
+    )
+  }
 
   return (
     <div className="card p-0 overflow-hidden">
       <div className="overflow-x-auto">
-        <div style={{ minWidth: (lanes.length * 168 + 54) + 'px' }}>
-          <div className="flex border-b-2 border-gray-200 bg-gray-50 sticky top-0 z-30">
-            <div className="shrink-0 border-r border-gray-200" style={{ width: 54 }} />
-            {lanes.map(worker => {
-              const laneCount = dayBookings.filter(b => worker ? b.assigned_to === worker : !b.assigned_to).length
-              return (
-                <div key={worker || 'unassigned'} className="flex-1 min-w-[168px] border-l border-gray-200 px-2 py-1.5 text-center">
-                  <div className={'font-bold text-sm truncate ' + (worker ? 'text-gray-800' : 'text-amber-700')}>
-                    {worker ? worker.split('@')[0] : 'Unassigned'}
-                  </div>
-                  <div className="text-xs text-gray-400">{laneCount} {laneCount === 1 ? 'booking' : 'bookings'}</div>
+        <div className="min-w-[420px]">
+          {times.map(time => {
+            const group = byTime[time]
+            return (
+              <div key={time} className="flex border-b border-gray-100 last:border-b-0 bg-white">
+                <div className="w-16 shrink-0 border-r border-gray-200 bg-gray-50 px-2 py-3 text-right text-xs font-bold text-gray-500">
+                  {time}
                 </div>
-              )
-            })}
-          </div>
-
-          <div className="flex" style={{ height: gridHeight }}>
-            <div className="shrink-0 relative border-r border-gray-200" style={{ width: 54 }}>
-              {hourLabels.map((label, i) => (
-                <div key={label} className="absolute w-full" style={{ top: i * ROW_PX - 9 }}>
-                  <span className="block text-right pr-2 text-xs text-gray-400">{label}</span>
-                </div>
-              ))}
-            </div>
-
-            {lanes.map(worker => {
-              const laneBookings = dayBookings.filter(b => worker ? b.assigned_to === worker : !b.assigned_to)
-              const groups = {}
-              laneBookings.forEach(b => {
-                if (!groups[b.time_booked]) groups[b.time_booked] = []
-                groups[b.time_booked].push(b)
-              })
-              return (
-                <div key={worker || 'unassigned'} className="flex-1 min-w-[168px] relative border-l border-gray-200" style={{ height: gridHeight }}>
-                  {hourLabels.map((_, i) => (
-                    <div key={i} className="absolute w-full border-t border-gray-100" style={{ top: i * ROW_PX }} />
-                  ))}
-                  {breakPeriods.map((period, i) => (
-                    <div
-                      key={i}
-                      className="absolute inset-x-0 bg-gray-200/70 border-y border-dashed border-gray-300 z-10 pointer-events-none flex items-center justify-center"
-                      style={{
-                        top: ((timeToMins(period.start) - startMins) / 60) * ROW_PX,
-                        height: ((timeToMins(period.end) - timeToMins(period.start)) / 60) * ROW_PX,
-                      }}
-                    >
-                      <span className="text-xs text-gray-400 font-medium">break</span>
-                    </div>
-                  ))}
-                  {nowTop !== null && (
-                    <div className="absolute w-full z-20 pointer-events-none" style={{ top: nowTop }}>
-                      <div className="border-t-2 border-red-500" />
-                    </div>
-                  )}
-                  {laneBookings.map(b => {
-                    const group = groups[b.time_booked]
-                    const index = group.indexOf(b)
-                    const isSelected = selected?.id === b.id
+                <div
+                  className="grid flex-1 gap-1.5 p-1.5"
+                  style={{
+                    gridTemplateColumns: `repeat(${group.length}, minmax(160px, 1fr))`,
+                    minWidth: Math.max(340, group.length * 166) + 'px',
+                  }}
+                >
+                  {group.map(booking => {
+                    const isSelected = selected?.id === booking.id
                     return (
                       <button
-                        key={b.id}
-                        onClick={() => onSelect(isSelected ? null : b)}
-                        className={'absolute rounded-md border border-l-4 text-left px-2 py-1 overflow-hidden hover:shadow-sm z-20 transition-shadow ' + getColor(b) + (isSelected ? ' ring-2 ring-blue-400 ring-offset-1' : '')}
-                        style={{
-                          top: ((timeToMins(b.time_booked) - startMins) / 60) * ROW_PX + 2,
-                          height: ROW_PX - 4,
-                          left: `calc(${(index / group.length) * 100}% + 2px)`,
-                          width: `calc(${(1 / group.length) * 100}% - 4px)`,
-                        }}
+                        key={booking.id}
+                        onClick={() => onSelect(isSelected ? null : booking)}
+                        className={'h-12 rounded-md border border-l-4 text-left px-2 py-1 overflow-hidden hover:shadow-sm transition-shadow ' + getColor(booking) + (isSelected ? ' ring-2 ring-blue-400 ring-offset-1' : '')}
                       >
-                        <div className="font-bold text-xs leading-tight truncate">{b.full_name || 'Unknown'}</div>
-                        <div className="text-xs opacity-80">{b.time_booked}</div>
-                        {!b.intake_complete && b.status === 'Active' && group.length === 1 && (
-                          <div className="text-xs font-bold">no intake</div>
-                        )}
+                        <div className="font-bold text-xs leading-tight truncate">{booking.full_name || 'Unknown'}</div>
+                        <div className="text-[11px] opacity-75 truncate">
+                          {booking.assigned_to ? booking.assigned_to.split('@')[0] : 'Unassigned'}
+                          {!booking.intake_complete && booking.status === 'Active' ? ' · no intake' : ''}
+                        </div>
                       </button>
                     )
                   })}
-                  {laneBookings.length === 0 && (
-                    <Link to="/bookings/new" className="absolute inset-0 flex items-center justify-center text-gray-200 hover:text-blue-300 hover:bg-blue-50 text-3xl">+</Link>
-                  )}
                 </div>
-              )
-            })}
+              </div>
+            )
+          })}
           </div>
-        </div>
       </div>
     </div>
   )
