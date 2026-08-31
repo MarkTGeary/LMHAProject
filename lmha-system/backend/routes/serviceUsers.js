@@ -47,7 +47,8 @@ router.get('/:id/bookings', async (req, res, next) => {
             LEFT JOIN service_users su ON b.service_user_id = su.id
             LEFT JOIN intake_forms i ON i.booking_id = b.id
             WHERE b.service_user_id = ?
-            ORDER BY b.date DESC, b.time_booked DESC`,
+            ORDER BY b.date DESC, b.time_booked DESC
+            LIMIT 200`,
       args: [id],
     });
     res.json(result.rows);

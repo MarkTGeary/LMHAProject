@@ -185,7 +185,9 @@ router.get('/', async (req, res, next) => {
     }
 
     const order = service_user_id ? 'DESC' : 'ASC';
-    sql += ` ORDER BY b.date ${order}, b.time_booked ${order}`;
+    // Bound every list response so an authenticated account cannot extract the
+    // entire database with one request. Normal screens request far fewer rows.
+    sql += ` ORDER BY b.date ${order}, b.time_booked ${order} LIMIT 500`;
 
     const result = await db.execute({ sql, args });
     res.json(result.rows);

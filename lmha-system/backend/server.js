@@ -16,6 +16,7 @@ const {
 validateProductionEnv();
 
 const db = require('./db');
+const { createRateLimit, securityHeaders } = require('./middleware/security');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -27,6 +28,8 @@ const PROTECTED_EMAIL = getRootAdminEmail();
 
 // Middleware
 app.set('trust proxy', 1);
+app.disable('x-powered-by');
+app.use(securityHeaders);
 app.use(cors({
   origin(origin, cb) {
     if (!origin || FRONTEND_URLS.includes(origin)) return cb(null, true);
@@ -82,21 +85,18 @@ app.use(async (_req, _res, next) => {
 // Routes
 app.use('/auth', require('./routes/auth'));
 const { requireAdmin, requireLocation } = require('./middleware/requireAuth');
-app.use('/api/admin',         requireAdmin,    require('./routes/admin'));
-app.use('/api/bookings',      requireLocation, require('./routes/bookings'));
-app.use('/api/service-users', requireLocation, require('./routes/serviceUsers'));
-app.use('/api/intake-forms',  requireLocation, require('./routes/intakeForms'));
-app.use('/api/metrics',       requireLocation, require('./routes/metrics'));
-app.use('/api/limitations',   requireLocation, require('./routes/limitations'));
+const apiReadLimit = createRateLimit({ namespace: 'api', windowMs: 5 * 60 * 1000, max: 600 });
+const personSearchLimit = createRateLimit({ namespace: 'person-search', windowMs: 60 * 1000, max: 30 });
+app.use('/api/admin',         requireAdmin,    apiReadLimit, require('./routes/admin'));
+app.use('/api/bookings',      requireLocation, apiReadLimit, require('./routes/bookings'));
+app.use('/api/service-users/search', requireLocation, personSearchLimit);
+app.use('/api/service-users', requireLocation, apiReadLimit, require('./routes/serviceUsers'));
+app.use('/api/intake-forms',  requireLocation, apiReadLimit, require('./routes/intakeForms'));
+app.use('/api/metrics',       requireLocation, apiReadLimit, require('./routes/metrics'));
+app.use('/api/limitations',   requireLocation, apiReadLimit, require('./routes/limitations'));
 
 // Health check
-app.get('/api/health', (req, res) => res.json({
-  ok: true,
-  timestamp: new Date().toISOString(),
-  nodeEnv: process.env.NODE_ENV,
-  hasTurso: !!process.env.TURSO_DATABASE_URL,
-  hasFrontendUrl: FRONTEND_URLS.length > 0,
-}));
+app.get('/api/health', (_req, res) => res.json({ ok: true }));
 
 // Global error handler
 app.use((err, req, res, _next) => {
