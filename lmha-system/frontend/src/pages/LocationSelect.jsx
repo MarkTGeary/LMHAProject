@@ -36,7 +36,7 @@ export default function LocationSelect() {
             className="bg-purple-600 hover:bg-purple-500 active:bg-purple-700 text-white rounded-3xl p-8 text-left transition-all duration-150 active:scale-95 shadow-xl"
           >
             <div className="text-5xl mb-3">☕</div>
-            <div className="text-3xl font-bold">Solace Café</div>
+            <div className="text-3xl font-bold">Solace Cafe</div>
             <div className="text-purple-200 text-lg mt-1">Evening Peer Support Service</div>
             <div className="text-purple-300 text-sm mt-2">Thu–Sun • 18:00–00:00</div>
           </button>

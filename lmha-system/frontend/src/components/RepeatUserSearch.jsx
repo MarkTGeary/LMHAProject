@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { apiFetch } from '../lib/api'
+import { formatLocation } from '../lib/constants'
 
 export default function RepeatUserSearch({ onSelect, onClear }) {
   const [query, setQuery] = useState('')
@@ -92,7 +93,7 @@ export default function RepeatUserSearch({ onSelect, onClear }) {
                           {b.outcome || 'Pending'}
                         </span>
                       </div>
-                      <div className="text-xs text-gray-500 mt-0.5">{b.location}{b.time_booked ? ` · ${b.time_booked}` : ''}</div>
+                      <div className="text-xs text-gray-500 mt-0.5">{formatLocation(b.location)}{b.time_booked ? ` · ${b.time_booked}` : ''}</div>
                       {b.notes && <div className="text-xs text-gray-400 italic mt-1">{b.notes}</div>}
                     </div>
                   )
@@ -132,12 +133,12 @@ export default function RepeatUserSearch({ onSelect, onClear }) {
       )}
       {searchError && (
         <div className="absolute z-50 w-full bg-red-50 border-2 border-red-300 rounded-xl shadow-xl mt-1 px-4 py-3 text-red-700 text-sm">
-          Search failed — check connection and try again
+          Search failed. Check connection and try again.
         </div>
       )}
       {query.length >= 2 && results.length === 0 && !loading && !searchError && (
         <div className="absolute z-50 w-full bg-white border-2 border-gray-200 rounded-xl shadow-xl mt-1 px-4 py-3 text-gray-500 text-sm">
-          No existing records found — will create new service user
+          No existing records found. A new service user will be created.
         </div>
       )}
     </div>

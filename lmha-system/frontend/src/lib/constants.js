@@ -13,6 +13,10 @@ export const LOCATION_RULES = {
 
 export const LOCK_DAYS = 21
 
+export function formatLocation(location) {
+  return location === 'Solace Café' ? 'Solace Cafe' : location
+}
+
 // A booking is locked for editing once it is more than a week old — unless the
 // current user is an admin. Workers get a 7-day grace window so outcomes/intake
 // can be written up after the fact (e.g. late-night Solace sessions). Admins can

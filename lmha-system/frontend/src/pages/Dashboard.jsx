@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { useAuth } from '../App'
 import Layout from '../components/Layout'
 import { apiFetch } from '../lib/api'
+import { formatLocation } from '../lib/constants'
 
 export default function Dashboard() {
   const { location } = useAuth()
@@ -33,13 +34,13 @@ export default function Dashboard() {
           <div className="text-sm font-medium opacity-80 mb-1">
             {new Date().toLocaleDateString('en-IE', { weekday: 'long', day: 'numeric', month: 'long' })}
           </div>
-          <h2 className="text-3xl font-bold">{location}</h2>
+          <h2 className="text-3xl font-bold">{formatLocation(location)}</h2>
           <p className="opacity-80 mt-1">Case Management System</p>
         </div>
 
         {statsError && (
           <div className="bg-red-50 border-2 border-red-300 rounded-xl p-3 text-red-700 text-sm font-semibold">
-            Could not load stats — check your connection and refresh.
+            Could not load stats. Check your connection and refresh.
           </div>
         )}
 

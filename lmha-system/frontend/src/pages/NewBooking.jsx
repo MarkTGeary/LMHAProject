@@ -4,7 +4,7 @@ import { useAuth } from '../App'
 import Layout from '../components/Layout'
 import RepeatUserSearch from '../components/RepeatUserSearch'
 import { apiFetch } from '../lib/api'
-import { LOCATION_RULES, isBookingLocked, LOCK_MESSAGE } from '../lib/constants'
+import { LOCATION_RULES, formatLocation, isBookingLocked, LOCK_MESSAGE } from '../lib/constants'
 
 const INTERACTION_TYPES = [
   { value: 'Phone Call', icon: '📞', color: 'bg-green-100 border-green-400 text-green-800' },
@@ -220,7 +220,7 @@ export default function NewBooking({ editMode }) {
             />
             {dayInvalid && (
               <p className="text-amber-600 text-sm mt-1">
-                Note: {form.location} normally operates {LOCATION_RULES[form.location]?.label} — booking will still be saved.
+                Note: {formatLocation(form.location)} normally operates {LOCATION_RULES[form.location]?.label}. The booking will still be saved.
               </p>
             )}
           </div>
@@ -231,7 +231,7 @@ export default function NewBooking({ editMode }) {
               dayInvalid ? (
                 <div>
                   <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mb-2">
-                    Outside normal operating days — enter the actual time.
+                    Outside normal operating days. Enter the actual time.
                   </p>
                   <input type="time" className="input" value={form.time_booked}
                     onChange={e => set('time_booked', e.target.value)} step="60" />
@@ -241,7 +241,7 @@ export default function NewBooking({ editMode }) {
               ) : emergencyMode ? (
                 <div>
                   <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mb-2">
-                    Emergency booking — enter any time.
+                    Emergency booking. Enter any time.
                   </p>
                   <input type="time" className="input" value={form.time_booked}
                     onChange={e => set('time_booked', e.target.value)} step="60" />
@@ -249,7 +249,7 @@ export default function NewBooking({ editMode }) {
               ) : flexibleTiming ? (
                 <div>
                   <p className="text-xs text-blue-700 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 mb-2">
-                    Flexible timing — enter the actual time of arrival.
+                    Flexible timing. Enter the actual time of arrival.
                   </p>
                   <input type="time" className="input" value={form.time_booked}
                     onChange={e => set('time_booked', e.target.value)} step="60" />
@@ -292,7 +292,7 @@ export default function NewBooking({ editMode }) {
                     : 'bg-gray-50 border border-gray-200 text-gray-600'
               }`}>
                 {sessionInfo.used}/{sessionInfo.max} sessions booked tonight
-                {sessionInfo.used >= sessionInfo.max && ' — limit reached'}
+                {sessionInfo.used >= sessionInfo.max && ': limit reached'}
               </div>
             )}
 
@@ -368,7 +368,7 @@ export default function NewBooking({ editMode }) {
                 onChange={e => { setAssignSearch(e.target.value); setAssignDropdownOpen(true) }}
                 onFocus={() => { setAssignSearch(''); setAssignDropdownOpen(true) }}
                 onBlur={() => setTimeout(() => setAssignDropdownOpen(false), 150)}
-                placeholder={form.assigned_to ? form.assigned_to : 'Assign Later — type to search'}
+                placeholder={form.assigned_to ? form.assigned_to : 'Assign later or type to search'}
               />
               {assignDropdownOpen && (
                 <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg max-h-52 overflow-y-auto">
@@ -377,7 +377,7 @@ export default function NewBooking({ editMode }) {
                     className="w-full text-left px-4 py-2.5 hover:bg-gray-50 text-sm text-gray-500 border-b border-gray-100"
                     onMouseDown={() => { set('assigned_to', null); setAssignSearch(''); setAssignDropdownOpen(false) }}
                   >
-                    — Assign Later
+                    Assign Later
                   </button>
                   {filteredStaff.map(email => (
                     <button
@@ -394,8 +394,8 @@ export default function NewBooking({ editMode }) {
             </div>
             <p className="text-xs text-gray-400 mt-1.5">
               {form.assigned_to
-                ? <>Assigned to <strong className="text-gray-600">{form.assigned_to}</strong> — will appear on their schedule</>
-                : 'Not assigned — will not appear on anyone\'s schedule until assigned'}
+                ? <>Assigned to <strong className="text-gray-600">{form.assigned_to}</strong>. This will appear on their schedule.</>
+                : 'Not assigned. This will not appear on anyone\'s schedule until assigned.'}
             </p>
           </div>
         </div>
@@ -407,7 +407,7 @@ export default function NewBooking({ editMode }) {
           <div className="field">
             <label className="label">Referred From</label>
             <select className="input" value={form.referred_from} onChange={e => set('referred_from', e.target.value)}>
-              <option value="">— Select if known —</option>
+              <option value="">Select if known</option>
               {REFERRED_FROM.map(v => <option key={v} value={v}>{v}</option>)}
             </select>
           </div>

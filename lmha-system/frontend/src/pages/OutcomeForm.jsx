@@ -3,7 +3,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '../App'
 import Layout from '../components/Layout'
 import { apiFetch } from '../lib/api'
-import { isBookingLocked, LOCK_MESSAGE } from '../lib/constants'
+import { formatLocation, isBookingLocked, LOCK_MESSAGE } from '../lib/constants'
 
 const SUPPORT_TYPES = [
   { code: 'SS', label: 'Social Support' },
@@ -132,9 +132,9 @@ export default function OutcomeForm() {
         {/* Booking summary */}
         {booking && (
           <div className="card bg-gray-50">
-            <div className="font-bold text-lg">{booking.full_name || '—'}</div>
+            <div className="font-bold text-lg">{booking.full_name || 'Not provided'}</div>
             <div className="text-sm text-gray-600 mt-1">
-              {booking.date} at {booking.time_booked} • {booking.location} • {booking.interaction_type}
+              {booking.date} at {booking.time_booked} • {formatLocation(booking.location)} • {booking.interaction_type}
             </div>
             <div className="flex gap-2 mt-2 flex-wrap">
               <span className={`badge ${booking.status === 'Active' ? 'badge-active' : 'badge-closed'}`}>{booking.status}</span>
@@ -157,7 +157,7 @@ export default function OutcomeForm() {
           <h2 className="text-xl font-bold mb-4">Outcome <span className="text-red-500">*</span></h2>
           {isWalkIn && (
             <p className="text-sm text-gray-500 mb-3">
-              Walk-in / crisis contacts are recorded as Attended — the person was present.
+              Walk-in / crisis contacts are recorded as Attended because the person was present.
             </p>
           )}
           <div className="grid grid-cols-2 gap-3">
@@ -214,7 +214,7 @@ export default function OutcomeForm() {
             ))}
           </div>
           {form.outcome === 'Did Not Attend' && form.type_of_support.length === 0 && (
-            <p className="text-sm text-gray-400 mt-3">Not required for Did Not Attend — leave blank if no support was given.</p>
+            <p className="text-sm text-gray-400 mt-3">Not required for Did Not Attend. Leave blank if no support was given.</p>
           )}
         </div>
 
@@ -244,7 +244,7 @@ export default function OutcomeForm() {
         {!hasIntake && (
           <div className="bg-orange-50 border-2 border-orange-300 rounded-xl p-4 text-orange-800">
             <p className="font-bold">Intake form not completed</p>
-            <p className="text-sm mt-1">You can still record an outcome and close the case — intake is optional.</p>
+            <p className="text-sm mt-1">You can still record an outcome and close the case. Intake is optional.</p>
             <Link to={`/bookings/${id}/intake`} className="btn-warning btn-sm mt-2 inline-flex">
               Complete Intake →
             </Link>
@@ -291,7 +291,7 @@ export default function OutcomeForm() {
               <span>{met ? '✓' : '✗'}</span> {label}
             </div>
           ))}
-          <div className="text-gray-400 text-xs mt-2">Intake form and type of support are optional — record what you can.</div>
+          <div className="text-gray-400 text-xs mt-2">Intake form and type of support are optional. Record what you can.</div>
         </div>
       </div>
     </Layout>

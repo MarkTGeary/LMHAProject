@@ -4,7 +4,7 @@ import { useAuth } from '../App'
 import Layout from '../components/Layout'
 import RepeatUserSearch from '../components/RepeatUserSearch'
 import { apiFetch } from '../lib/api'
-import { isBookingLocked, LOCK_MESSAGE } from '../lib/constants'
+import { formatLocation, isBookingLocked, LOCK_MESSAGE } from '../lib/constants'
 
 const REFERRAL_SOURCES = [
   'Self-referral',
@@ -37,9 +37,9 @@ const SUPPORT_NEEDS_OPTIONS = [
   { key: 'info_wider_community', label: 'Information on wider community supports (MABS, Family Resource etc)' },
   { key: 'peer_coping',          label: 'Peer support to enhance coping skills' },
   { key: 'peer_recovery',        label: 'Peer support to support recovery' },
-  { key: 'crisis_deescalation',  label: 'Crisis support — de-escalation' },
-  { key: 'crisis_ae',            label: 'Crisis support — onward referral to A&E' },
-  { key: 'crisis_guards',        label: 'Crisis support — Gardaí or other community support' },
+  { key: 'crisis_deescalation',  label: 'Crisis support: de-escalation' },
+  { key: 'crisis_ae',            label: 'Crisis support: onward referral to A&E' },
+  { key: 'crisis_guards',        label: 'Crisis support: Gardaí or other community support' },
   { key: 'social',               label: 'Social support' },
 ]
 
@@ -336,7 +336,7 @@ export default function IntakeForm() {
       {booking && (
         <div className="card mb-4 bg-blue-50 border-blue-200">
           <div className="font-bold">{booking.full_name || 'Unnamed'}</div>
-          <div className="text-sm text-blue-700">{booking.date} at {booking.time_booked} • {booking.location}</div>
+          <div className="text-sm text-blue-700">{booking.date} at {booking.time_booked} • {formatLocation(booking.location)}</div>
         </div>
       )}
 
@@ -570,7 +570,7 @@ export default function IntakeForm() {
             />
 
             <div className="field">
-              <label className="label">Referred by — Name</label>
+              <label className="label">Referred by: Name</label>
               <input className="input" value={p2.referred_by_name}
                 onChange={e => setP2Field('referred_by_name', e.target.value)} />
             </div>

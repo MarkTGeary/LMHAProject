@@ -84,7 +84,7 @@ export default function Limitations() {
       setTimeout(() => setSuccess(false), 3000)
       await loadRecords()
     } catch {
-      setError('Network error — please try again')
+      setError('Network error. Please try again.')
     } finally {
       setSaving(false)
     }
@@ -106,7 +106,7 @@ export default function Limitations() {
         <div className="card">
           <h2 className="text-xl font-bold mb-1">Log a Limitation</h2>
           <p className="text-sm text-gray-500 mb-4">
-            Use this when someone tried to reach us but we couldn't help — and no booking exists for them.
+            Use this when someone tried to reach us but we couldn't help, and no booking exists for them.
           </p>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>

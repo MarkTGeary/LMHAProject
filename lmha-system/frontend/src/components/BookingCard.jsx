@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom'
+import { formatLocation } from '../lib/constants'
 
 const OUTCOME_BADGE = {
   'Attended': 'badge-attended',
@@ -25,12 +26,12 @@ export default function BookingCard({ booking }) {
       {/* Header row */}
       <div className="flex items-start justify-between gap-3 mb-3">
         <div className="flex-1 min-w-0">
-          <div className="font-bold text-lg truncate">{booking.full_name || '— No name —'}</div>
+          <div className="font-bold text-lg truncate">{booking.full_name || 'No name'}</div>
           {booking.phone && <div className="text-gray-500 text-sm">{booking.phone}</div>}
         </div>
         <div className="flex flex-col items-end gap-1.5 shrink-0">
           <span className={booking.location === 'LMHA' ? 'badge-lmha' : 'badge-solace'}>
-            {booking.location}
+            {formatLocation(booking.location)}
           </span>
           <span className={`badge ${booking.status === 'Active' ? 'badge-active' : booking.status === 'Closed' ? 'badge-closed' : 'badge-dna'}`}>
             {booking.status}

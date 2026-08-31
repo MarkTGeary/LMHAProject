@@ -31,12 +31,12 @@ export default function MetricsPreview({ metrics }) {
       {/* Print header */}
       <div className="hidden print:block mb-6 text-center">
         <h1 className="text-2xl font-bold">Limerick Mental Health Association</h1>
-        <h2 className="text-xl">{location} — Metrics Report</h2>
+        <h2 className="text-xl">{formatLocation(location)}: Metrics Report</h2>
         <p>{dateRange?.startDate} to {dateRange?.endDate}</p>
         <p className="text-sm text-gray-500">Generated {new Date().toLocaleDateString('en-IE')}</p>
       </div>
 
-      <Section title="Section 1 — General Service Information">
+      <Section title="Section 1: General Service Information">
         <Row label="Total bookings received" value={s1?.total_bookings_received} info />
         <Row label="Total attendees through bookings" value={s1?.total_attendees_through_bookings} />
         <Row label="Walk-in crisis support" value={s1?.total_walk_in_crisis} />
@@ -59,7 +59,7 @@ export default function MetricsPreview({ metrics }) {
         <Row label="TOTAL People" value={s1?.total_people} total />
       </Section>
 
-      <Section title="Section 2 — Support Requirements">
+      <Section title="Section 2: Support Requirements">
         <Row label="Information seeking only" value={s2?.information_seeking} />
         <Row label="Social support / signposting / self-reflection" value={s2?.social_support_signposting} />
         <Row label="One-to-one peer support" value={s2?.one_to_one_peer_support} />
@@ -68,20 +68,20 @@ export default function MetricsPreview({ metrics }) {
         <Row label="TOTAL" value={s2?.total} total />
       </Section>
 
-      <Section title="Section 3 — Support Requirements by Type">
+      <Section title="Section 3: Support Requirements by Type">
         <Row label="Info: statutory MH services (HSE)" value={s3?.info_statutory_mh_hse} />
         <Row label="Info: non-statutory MH supports" value={s3?.info_non_statutory_mh} />
         <Row label="Info: wider community supports (e.g. MABS)" value={s3?.info_wider_community} />
-        <Row label="Peer support — enhance coping skills" value={s3?.peer_support_coping} />
-        <Row label="Peer support — support recovery" value={s3?.peer_support_recovery} />
-        <Row label="Crisis — de-escalation" value={s3?.crisis_deescalation} />
-        <Row label="Crisis — onward referral to A&E" value={s3?.crisis_onward_ae} />
-        <Row label="Crisis — Gardaí / community support" value={s3?.crisis_guards_community} />
+        <Row label="Peer support: enhance coping skills" value={s3?.peer_support_coping} />
+        <Row label="Peer support: support recovery" value={s3?.peer_support_recovery} />
+        <Row label="Crisis: de-escalation" value={s3?.crisis_deescalation} />
+        <Row label="Crisis: onward referral to A&E" value={s3?.crisis_onward_ae} />
+        <Row label="Crisis: Gardaí / community support" value={s3?.crisis_guards_community} />
         <Row label="Social support" value={s3?.social_support} />
         <Row label="TOTAL" value={s3?.total} total />
       </Section>
 
-      <Section title="Section 4 — Referral Activity">
+      <Section title="Section 4: Referral Activity">
         <Row label="Self-referral" value={s4?.self_referral} />
         <Row label="Community organisations (NGOs/Charities)" value={s4?.community_ngo} />
         <Row label="HSE Mental Health Services" value={s4?.hse_mh_services} />
@@ -96,7 +96,7 @@ export default function MetricsPreview({ metrics }) {
         <Row label="TOTAL" value={s4?.total} total />
       </Section>
 
-      <Section title="Section 5 — Advocacy / Follow-up: Community & Voluntary">
+      <Section title="Section 5: Advocacy / Follow-up: Community & Voluntary">
         <Row label="C&V Counselling Services (MyMind, Turn2Me etc)" value={s5cv?.cv_counselling} />
         <Row label="C&V Housing Support Services" value={s5cv?.cv_housing} />
         <Row label="C&V Finance Support Services" value={s5cv?.cv_finance} />
@@ -106,7 +106,7 @@ export default function MetricsPreview({ metrics }) {
         <Row label="TOTAL" value={s5cv?.total} total />
       </Section>
 
-      <Section title="Section 5 — Advocacy / Follow-up: Statutory Services">
+      <Section title="Section 5: Advocacy / Follow-up: Statutory Services">
         <Row label="HSE Mental Health Services" value={s5stat?.statutory_hse_mh} />
         <Row label="HSE Primary Care Services" value={s5stat?.statutory_hse_primary_care} />
         <Row label="HSE Disability Services" value={s5stat?.statutory_hse_disability} />
@@ -120,7 +120,7 @@ export default function MetricsPreview({ metrics }) {
         <Row label="TOTAL" value={s5stat?.total} total />
       </Section>
 
-      <Section title="Miscellaneous — Feedback from Service Users">
+      <Section title="Miscellaneous: Feedback from Service Users">
         <Row label="Thank you letter / Card / Email" value={fb?.thankyou_letters} />
         <Row label="Verbal Feedback" value={fb?.verbal_feedback} />
         <Row label="Testimonials" value={fb?.testimonials} />
@@ -128,7 +128,7 @@ export default function MetricsPreview({ metrics }) {
         <Row label="TOTAL" value={(fb?.thankyou_letters ?? 0) + (fb?.verbal_feedback ?? 0) + (fb?.testimonials ?? 0) + (fb?.vox_pop ?? 0)} total />
       </Section>
 
-      <Section title="Limitations — Out-of-Hours Contact">
+      <Section title="Limitations: Out-of-Hours Contact">
         {location === 'LMHA' ? (
           <>
             <Row label="Looked for appointment on Saturday" value={lim?.lim_day1} />
@@ -154,3 +154,4 @@ export default function MetricsPreview({ metrics }) {
     </div>
   )
 }
+import { formatLocation } from '../lib/constants'

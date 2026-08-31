@@ -3,6 +3,7 @@ import { useAuth } from '../App'
 import Layout from '../components/Layout'
 import MetricsPreview from '../components/MetricsPreview'
 import { apiFetch } from '../lib/api'
+import { formatLocation } from '../lib/constants'
 
 function getMondayOfWeek(d = new Date()) {
   const day = d.getDay()
@@ -95,7 +96,7 @@ export default function MetricsDashboard() {
 
   const submit = async () => {
     if (!metrics) return
-    if (!confirm(`Push metrics for ${location} (${start} to ${end}) to Google Sheets? This cannot be undone.`)) return
+    if (!confirm(`Push metrics for ${formatLocation(location)} (${start} to ${end}) to Google Sheets? This cannot be undone.`)) return
     setError(''); setSubmitting(true); setSubmitResult(null)
     try {
       const res = await apiFetch('/api/metrics/submit', {
@@ -153,7 +154,7 @@ export default function MetricsDashboard() {
             </div>
           </div>
           <div className="mt-4 p-3 bg-gray-50 rounded-xl text-sm text-gray-600">
-            Location: <strong>{location}</strong>
+            Location: <strong>{formatLocation(location)}</strong>
           </div>
         </div>
 
@@ -177,7 +178,7 @@ export default function MetricsDashboard() {
             <div className="card">
               <div className="flex items-center justify-between mb-4">
                 <div>
-                  <h2 className="text-xl font-bold">Metrics Preview — {location}</h2>
+                  <h2 className="text-xl font-bold">Metrics Preview: {formatLocation(location)}</h2>
                   {metrics?._source === 'sheets'
                     ? <span className="text-xs font-semibold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">
                         Read from Google Sheets · column {metrics._column}
@@ -219,7 +220,7 @@ export default function MetricsDashboard() {
 
             {metrics?._source !== 'sheets' && (
               <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-amber-800 text-sm no-print">
-                <strong>Note:</strong> This will write to the {location} spreadsheet. Existing cells are never deleted. Make sure the correct week column exists in the spreadsheet.
+                <strong>Note:</strong> This will write to the {formatLocation(location)} spreadsheet. Existing cells are never deleted. Make sure the correct week column exists in the spreadsheet.
               </div>
             )}
           </>
@@ -230,7 +231,7 @@ export default function MetricsDashboard() {
             onClick={() => setMiscOpen(o => !o)}
             className="w-full flex items-center justify-between px-4 py-3 bg-gray-100 hover:bg-gray-200 transition-colors text-sm font-semibold text-gray-700"
           >
-            <span>Miscellaneous — Feedback from Service Users</span>
+            <span>Miscellaneous: Feedback from Service Users</span>
             <span className="flex items-center gap-2">
               <span className="text-gray-500 font-normal">
                 Total: {Object.values(feedback).reduce((a, b) => a + (b || 0), 0)}
@@ -267,7 +268,7 @@ export default function MetricsDashboard() {
                   {feedbackSaving ? 'Saving…' : 'Save Feedback Counts'}
                 </button>
                 {feedbackSaved && <span className="text-green-600 text-sm font-medium">✓ Saved</span>}
-                {feedbackError && <span className="text-red-600 text-sm font-medium">Failed to save — try again</span>}
+                {feedbackError && <span className="text-red-600 text-sm font-medium">Failed to save. Try again.</span>}
               </div>
             </div>
           )}

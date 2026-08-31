@@ -1,6 +1,7 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useRef, useState } from 'react'
 import { useAuth } from '../App'
+import { formatLocation } from '../lib/constants'
 
 export default function Layout({ children, title, back }) {
   const { user, location, logout, setLocation } = useAuth()
@@ -48,7 +49,7 @@ export default function Layout({ children, title, back }) {
               location === 'LMHA' ? 'bg-blue-600 hover:bg-blue-700' : 'bg-purple-600 hover:bg-purple-700'
             }`}
           >
-            {location}
+            {formatLocation(location)}
           </button>
 
           <div className="relative" onMouseEnter={openMenu} onMouseLeave={scheduleClose}>
