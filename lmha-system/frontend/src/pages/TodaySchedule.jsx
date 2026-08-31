@@ -31,6 +31,120 @@ function getColor(b) {
   return 'bg-blue-500 border-blue-600 text-white'
 }
 
+function DailyScheduleGrid({ bookings, date, hours, breakPeriods, selected, onSelect, todayStr }) {
+  const ROW_PX = 68
+  const startMins = hours.start * 60
+  const hourCount = hours.end - hours.start
+  const gridHeight = hourCount * ROW_PX
+  const dayBookings = bookings.filter(b => b.date === date)
+  const assignedWorkers = [...new Set(dayBookings.map(b => b.assigned_to).filter(Boolean))].sort()
+  const lanes = [null, ...assignedWorkers]
+  const hourLabels = Array.from({ length: hourCount + 1 }, (_, i) => {
+    const h = hours.start + i
+    return h >= 24 ? '00:00' : String(h).padStart(2, '0') + ':00'
+  })
+  const nowTop = (() => {
+    if (date !== todayStr) return null
+    const now = new Date()
+    const minutes = now.getHours() * 60 + now.getMinutes()
+    if (minutes < startMins || minutes > hours.end * 60) return null
+    return ((minutes - startMins) / 60) * ROW_PX
+  })()
+
+  return (
+    <div className="card p-0 overflow-hidden">
+      <div className="overflow-x-auto">
+        <div style={{ minWidth: (lanes.length * 190 + 60) + 'px' }}>
+          <div className="flex border-b-2 border-gray-200 bg-gray-50 sticky top-0 z-30">
+            <div className="shrink-0 border-r border-gray-200" style={{ width: 60 }} />
+            {lanes.map(worker => {
+              const laneCount = dayBookings.filter(b => worker ? b.assigned_to === worker : !b.assigned_to).length
+              return (
+                <div key={worker || 'unassigned'} className="flex-1 min-w-[190px] border-l border-gray-200 px-3 py-2 text-center">
+                  <div className={'font-bold text-sm truncate ' + (worker ? 'text-gray-800' : 'text-amber-700')}>
+                    {worker ? worker.split('@')[0] : 'Unassigned'}
+                  </div>
+                  <div className="text-xs text-gray-400">{laneCount} {laneCount === 1 ? 'booking' : 'bookings'}</div>
+                </div>
+              )
+            })}
+          </div>
+
+          <div className="flex" style={{ height: gridHeight }}>
+            <div className="shrink-0 relative border-r border-gray-200" style={{ width: 60 }}>
+              {hourLabels.map((label, i) => (
+                <div key={label} className="absolute w-full" style={{ top: i * ROW_PX - 9 }}>
+                  <span className="block text-right pr-2 text-xs text-gray-400">{label}</span>
+                </div>
+              ))}
+            </div>
+
+            {lanes.map(worker => {
+              const laneBookings = dayBookings.filter(b => worker ? b.assigned_to === worker : !b.assigned_to)
+              const groups = {}
+              laneBookings.forEach(b => {
+                if (!groups[b.time_booked]) groups[b.time_booked] = []
+                groups[b.time_booked].push(b)
+              })
+              return (
+                <div key={worker || 'unassigned'} className="flex-1 min-w-[190px] relative border-l border-gray-200" style={{ height: gridHeight }}>
+                  {hourLabels.map((_, i) => (
+                    <div key={i} className="absolute w-full border-t border-gray-100" style={{ top: i * ROW_PX }} />
+                  ))}
+                  {breakPeriods.map((period, i) => (
+                    <div
+                      key={i}
+                      className="absolute inset-x-0 bg-gray-200/70 border-y border-dashed border-gray-300 z-10 pointer-events-none flex items-center justify-center"
+                      style={{
+                        top: ((timeToMins(period.start) - startMins) / 60) * ROW_PX,
+                        height: ((timeToMins(period.end) - timeToMins(period.start)) / 60) * ROW_PX,
+                      }}
+                    >
+                      <span className="text-xs text-gray-400 font-medium">break</span>
+                    </div>
+                  ))}
+                  {nowTop !== null && (
+                    <div className="absolute w-full z-20 pointer-events-none" style={{ top: nowTop }}>
+                      <div className="border-t-2 border-red-500" />
+                    </div>
+                  )}
+                  {laneBookings.map(b => {
+                    const group = groups[b.time_booked]
+                    const index = group.indexOf(b)
+                    const isSelected = selected?.id === b.id
+                    return (
+                      <button
+                        key={b.id}
+                        onClick={() => onSelect(isSelected ? null : b)}
+                        className={'absolute rounded-lg border text-left px-2 py-1 overflow-hidden hover:brightness-90 z-20 ' + getColor(b) + (isSelected ? ' ring-2 ring-yellow-300 ring-offset-1' : '')}
+                        style={{
+                          top: ((timeToMins(b.time_booked) - startMins) / 60) * ROW_PX + 2,
+                          height: ROW_PX - 4,
+                          left: `calc(${(index / group.length) * 100}% + 2px)`,
+                          width: `calc(${(1 / group.length) * 100}% - 4px)`,
+                        }}
+                      >
+                        <div className="font-bold text-xs leading-tight truncate">{b.full_name || 'Unknown'}</div>
+                        <div className="text-xs opacity-80">{b.time_booked}</div>
+                        {!b.intake_complete && b.status === 'Active' && group.length === 1 && (
+                          <div className="text-xs font-bold">no intake</div>
+                        )}
+                      </button>
+                    )
+                  })}
+                  {laneBookings.length === 0 && (
+                    <Link to="/bookings/new" className="absolute inset-0 flex items-center justify-center text-gray-200 hover:text-blue-300 hover:bg-blue-50 text-3xl">+</Link>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function WeeklySchedule() {
   const { location, user } = useAuth()
   const _rules = LOCATION_RULES[location] || LOCATION_RULES['LMHA']
@@ -41,6 +155,8 @@ export default function WeeklySchedule() {
   const [loading, setLoading]     = useState(true)
   const [selected, setSelected]   = useState(null)
   const [viewFilter, setViewFilter] = useState('mine')
+  const [scheduleView, setScheduleView] = useState('week')
+  const [selectedDay, setSelectedDay] = useState(() => fmt(new Date()))
 
   const visibleDays = Array.from({ length: 7 }, (_, i) => {
     const d = new Date(weekStart)
@@ -60,9 +176,22 @@ export default function WeeklySchedule() {
       .catch(() => setLoading(false))
   }, [weekStart, location])
 
-  const prevWeek = () => { const d = new Date(weekStart); d.setDate(d.getDate() - 7); setWeekStart(getMondayOf(d)) }
-  const nextWeek = () => { const d = new Date(weekStart); d.setDate(d.getDate() + 7); setWeekStart(getMondayOf(d)) }
-  const goToday  = () => { setWeekStart(getMondayOf(new Date())); setSelected(null) }
+  const moveWeek = offset => {
+    const d = new Date(weekStart)
+    d.setDate(d.getDate() + offset * 7)
+    const nextStart = getMondayOf(d)
+    setWeekStart(nextStart)
+    const firstOpenDay = Array.from({ length: 7 }, (_, i) => {
+      const candidate = new Date(nextStart)
+      candidate.setDate(nextStart.getDate() + i)
+      return candidate
+    }).find(candidate => hours.days.includes(candidate.getDay()))
+    if (firstOpenDay) setSelectedDay(fmt(firstOpenDay))
+    setSelected(null)
+  }
+  const prevWeek = () => moveWeek(-1)
+  const nextWeek = () => moveWeek(1)
+  const goToday  = () => { setWeekStart(getMondayOf(new Date())); setSelectedDay(fmt(new Date())); setSelected(null) }
   const todayStr = fmt(new Date())
 
   const workers = useMemo(
@@ -112,8 +241,27 @@ export default function WeeklySchedule() {
   })() : ''
 
   return (
-    <Layout title="Weekly Schedule">
+    <Layout title="Schedule">
       <div className="space-y-4 pb-10">
+
+        <div className="flex justify-end">
+          <div className="inline-flex rounded-lg border border-gray-300 bg-gray-100 p-1" role="group" aria-label="Schedule view">
+            <button
+              type="button"
+              onClick={() => setScheduleView('week')}
+              className={'min-w-[88px] rounded-md px-4 py-2 text-sm font-semibold ' + (scheduleView === 'week' ? 'bg-white text-blue-700 shadow-sm' : 'text-gray-600 hover:text-gray-900')}
+            >
+              Week
+            </button>
+            <button
+              type="button"
+              onClick={() => setScheduleView('day')}
+              className={'min-w-[88px] rounded-md px-4 py-2 text-sm font-semibold ' + (scheduleView === 'day' ? 'bg-white text-blue-700 shadow-sm' : 'text-gray-600 hover:text-gray-900')}
+            >
+              Day
+            </button>
+          </div>
+        </div>
 
         <div className="card p-3 flex items-center gap-3">
           <button onClick={prevWeek} className="btn-secondary btn-sm px-4">Prev</button>
@@ -161,8 +309,39 @@ export default function WeeklySchedule() {
           <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-gray-400 inline-block" /> Closed</span>
         </div>
 
+        {scheduleView === 'day' && (
+          <div className="card p-2 flex gap-2 overflow-x-auto">
+            {visibleDays.map(d => {
+              const date = fmt(d)
+              const count = (byDate[date] || []).length
+              return (
+                <button
+                  key={date}
+                  type="button"
+                  onClick={() => { setSelectedDay(date); setSelected(null) }}
+                  className={'min-w-[92px] rounded-md px-3 py-2 text-center border ' + (selectedDay === date ? 'bg-blue-600 border-blue-600 text-white' : 'bg-white border-gray-200 text-gray-700 hover:border-blue-300')}
+                >
+                  <span className="block text-xs font-semibold uppercase">{DAY_NAMES[d.getDay()]}</span>
+                  <span className="block text-lg font-bold">{d.getDate()}</span>
+                  <span className={'block text-xs ' + (selectedDay === date ? 'text-blue-100' : 'text-gray-400')}>{count} booked</span>
+                </button>
+              )
+            })}
+          </div>
+        )}
+
         {loading ? (
           <div className="card py-16 text-center text-gray-500 text-lg">Loading...</div>
+        ) : scheduleView === 'day' ? (
+          <DailyScheduleGrid
+            bookings={displayBookings}
+            date={selectedDay}
+            hours={hours}
+            breakPeriods={breakPeriods}
+            selected={selected}
+            onSelect={setSelected}
+            todayStr={todayStr}
+          />
         ) : (
           <div className="card p-0 overflow-hidden">
             <div className="overflow-x-auto">
@@ -324,7 +503,7 @@ export default function WeeklySchedule() {
           </div>
         )}
 
-        {!loading && displayBookings.length > 0 && (
+        {!loading && scheduleView === 'week' && displayBookings.length > 0 && (
           <div className="space-y-3">
             <h3 className="font-bold text-gray-700 text-lg">Week summary ({displayBookings.length} bookings)</h3>
             {visibleDays.map(d => {
@@ -358,7 +537,7 @@ export default function WeeklySchedule() {
           </div>
         )}
 
-        {!loading && displayBookings.length === 0 && (
+        {!loading && scheduleView === 'week' && displayBookings.length === 0 && (
           <div className="card text-center py-10">
             <div className="text-gray-500 text-lg">
               {viewFilter === 'mine' ? 'No bookings assigned to you this week'
