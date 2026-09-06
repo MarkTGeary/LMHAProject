@@ -5,6 +5,7 @@ const { writeMetrics, readMetrics } = require('../services/googleSheets');
 const db = require('../db');
 const { ApiError, badRequest } = require('../lib/errors');
 const { assertRequestLocation, countInt, parseDateString } = require('../lib/validation');
+const { recordAudit } = require('../services/audit');
 
 function parseDateRange(input) {
   const start = parseDateString(input.start, 'start');
@@ -45,6 +46,7 @@ router.post('/submit', async (req, res, next) => {
     });
     const feedback = fbResult.rows[0] || { thankyou_letters: 0, verbal_feedback: 0, testimonials: 0, vox_pop: 0 };
     const result = await writeMetrics(location, { ...metrics, feedback }, start, end);
+    await recordAudit(req, { action: 'EXPORT', entityType: 'metrics', location, changedFields: ['google_sheets'] });
     res.json({ ok: true, result, metrics: { ...metrics, feedback } });
   } catch (err) {
     console.error('[Metrics] Submit error:', err);
@@ -98,6 +100,20 @@ router.post('/feedback', async (req, res, next) => {
               updated_at       = excluded.updated_at`,
       args: [location, week_start, thankyou_letters, verbal_feedback, testimonials, vox_pop],
     });
+    await recordAudit(req, {
+      action: 'UPDATE', entityType: 'metrics', location,
+      changedFields: ['thankyou_letters', 'verbal_feedback', 'testimonials', 'vox_pop'],
+    });
+    res.json({ ok: true });
+  } catch (err) { next(err); }
+});
+
+// Records a user-initiated browser print/export. No client data is accepted.
+router.post('/export-event', async (req, res, next) => {
+  try {
+    const location = assertRequestLocation(req, req.body.location);
+    parseDateRange(req.body);
+    await recordAudit(req, { action: 'EXPORT', entityType: 'metrics', location, changedFields: ['print'] });
     res.json({ ok: true });
   } catch (err) { next(err); }
 });

@@ -518,6 +518,34 @@ test('admins can erase service user personal data', async () => {
     args: [booking.body.id],
   });
   assert.equal(record.rows[0].notes, null);
+
+  const audit = await db.execute({
+    sql: `SELECT actor_email, action, entity_type, entity_id, service_user_id, changed_fields
+          FROM audit_events WHERE action = 'ANONYMISE' AND service_user_id = ?`,
+    args: [booking.body.service_user_id],
+  });
+  assert.equal(audit.rows.length, 1);
+  assert.equal(audit.rows[0].actor_email, 'admin@example.com');
+  assert.equal(audit.rows[0].entity_type, 'service_user');
+  assert.equal(audit.rows[0].changed_fields.includes('Erase Me'), false);
+});
+
+test('audit history is admin-only and paginated', async () => {
+  await request(app)
+    .get('/api/admin/audit-events')
+    .set('Cookie', staff.cookie)
+    .expect(403);
+
+  const res = await request(app)
+    .get('/api/admin/audit-events?limit=10&action=ANONYMISE')
+    .set('Cookie', admin.cookie)
+    .expect(200);
+
+  assert.equal(res.body.page, 1);
+  assert.equal(res.body.limit, 10);
+  assert.ok(res.body.total >= 1);
+  assert.ok(res.body.events.every(event => event.action === 'ANONYMISE'));
+  assert.ok(res.headers['x-request-id']);
 });
 
 test('revoked allowlist users are rejected on subsequent requests', async () => {

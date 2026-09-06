@@ -121,7 +121,12 @@ Login (Google OAuth)
 
 - Database: Turso/libSQL (`TURSO_DATABASE_URL` + `TURSO_AUTH_TOKEN`)
 - Auth: Google OAuth issues an 8-hour `HttpOnly` cookie with CSRF protection
-- **No records are ever deleted.** Cancellations set `status = 'Cancelled'`.
+- Cancellations set `status = 'Cancelled'`. Admins can anonymise a service user
+  for a GDPR erasure request while retaining non-identifying operational totals.
+- An append-only audit log records authenticated access to individual client
+  records, changes, anonymisation, metrics exports, and staff-access changes.
+  Audit metadata contains record IDs and changed field names, never form values,
+  search phrases, client names, notes, credentials, or authentication tokens.
 
 ---
 

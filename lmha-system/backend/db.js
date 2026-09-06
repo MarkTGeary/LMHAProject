@@ -114,6 +114,27 @@ async function initAndMigrate() {
       PRIMARY KEY (location, date, slot_time)
     ) WITHOUT ROWID;
 
+    CREATE TABLE IF NOT EXISTS audit_events (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      occurred_at TEXT NOT NULL DEFAULT (datetime('now')),
+      actor_email TEXT NOT NULL,
+      actor_role TEXT NOT NULL,
+      action TEXT NOT NULL CHECK(action IN (
+        'LOGIN','LOGOUT','VIEW','SEARCH','CREATE','UPDATE',
+        'ANONYMISE','EXPORT','ACCESS_CHANGE'
+      )),
+      outcome TEXT NOT NULL DEFAULT 'SUCCESS' CHECK(outcome IN ('SUCCESS','FAILURE')),
+      entity_type TEXT NOT NULL CHECK(entity_type IN (
+        'session','service_user','booking','intake_form','metrics',
+        'limitation','staff_account','audit_log'
+      )),
+      entity_id INTEGER,
+      service_user_id INTEGER,
+      location TEXT,
+      changed_fields TEXT NOT NULL DEFAULT '[]',
+      request_id TEXT
+    );
+
     CREATE INDEX IF NOT EXISTS idx_bookings_location_status_date
       ON bookings(location, status, date, time_booked);
     CREATE INDEX IF NOT EXISTS idx_bookings_location_date
@@ -124,6 +145,12 @@ async function initAndMigrate() {
       ON intake_forms(booking_id);
     CREATE INDEX IF NOT EXISTS idx_service_users_name
       ON service_users(full_name);
+    CREATE INDEX IF NOT EXISTS idx_audit_events_occurred
+      ON audit_events(occurred_at DESC, id DESC);
+    CREATE INDEX IF NOT EXISTS idx_audit_events_actor
+      ON audit_events(actor_email, occurred_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_audit_events_subject
+      ON audit_events(service_user_id, occurred_at DESC);
   `);
 
   console.log('[DB] Core tables ready.');

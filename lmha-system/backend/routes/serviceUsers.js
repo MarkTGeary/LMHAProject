@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const db = require('../db');
 const { badRequest, notFound } = require('../lib/errors');
+const { recordAudit } = require('../services/audit');
 const {
   booleanInt,
   enumValue,
@@ -30,6 +31,7 @@ router.get('/search', async (req, res, next) => {
             LIMIT 10`,
       args: [term, term],
     });
+    await recordAudit(req, { action: 'SEARCH', entityType: 'service_user' });
     res.json(result.rows);
   } catch (err) { next(err); }
 });
@@ -51,6 +53,7 @@ router.get('/:id/bookings', async (req, res, next) => {
             LIMIT 200`,
       args: [id],
     });
+    await recordAudit(req, { action: 'VIEW', entityType: 'service_user', entityId: id, serviceUserId: id });
     res.json(result.rows);
   } catch (err) { next(err); }
 });
@@ -67,6 +70,7 @@ router.get('/:id', async (req, res, next) => {
       args: [id],
     });
     if (!result.rows.length) throw notFound();
+    await recordAudit(req, { action: 'VIEW', entityType: 'service_user', entityId: id, serviceUserId: id });
     res.json(result.rows[0]);
   } catch (err) { next(err); }
 });
@@ -110,6 +114,10 @@ router.post('/', async (req, res, next) => {
     const user = await db.execute({
       sql: 'SELECT * FROM service_users WHERE id = ?',
       args: [Number(insertResult.lastInsertRowid)],
+    });
+    await recordAudit(req, {
+      action: 'CREATE', entityType: 'service_user', entityId: Number(insertResult.lastInsertRowid),
+      serviceUserId: Number(insertResult.lastInsertRowid), changedFields: Object.keys(req.body || {}),
     });
     res.status(201).json(user.rows[0]);
   } catch (err) { next(err); }
@@ -162,6 +170,10 @@ router.patch('/:id', async (req, res, next) => {
     const updated = await db.execute({
       sql: 'SELECT * FROM service_users WHERE id = ?',
       args: [id],
+    });
+    await recordAudit(req, {
+      action: 'UPDATE', entityType: 'service_user', entityId: id, serviceUserId: id,
+      changedFields: Object.keys(req.body || {}),
     });
     res.json(updated.rows[0]);
   } catch (err) { next(err); }

@@ -5,6 +5,7 @@ const router = express.Router();
 const { getBackendUrl, getFrontendUrls, getPrimaryFrontendUrl, normaliseOrigin } = require('../lib/config');
 const { createAuthToken, clearAuthCookie, hasValidCsrf, publicUserFromPayload, readAuthPayload, setAuthCookie } = require('../lib/authTokens');
 const { requireAuth } = require('../middleware/requireAuth');
+const { recordAudit } = require('../services/audit');
 
 const FRONTEND_URL = getPrimaryFrontendUrl();
 const FRONTEND_URLS = getFrontendUrls();
@@ -44,12 +45,15 @@ router.get('/google/callback',
       callbackURL: getOAuthCallbackUrl(req),
     })(req, res, next);
   },
-  (req, res) => {
+  async (req, res, next) => {
+    try {
     const { token } = createAuthToken(req.user);
     setAuthCookie(res, token);
     res.setHeader('Cache-Control', 'no-store');
+    await recordAudit(req, { action: 'LOGIN', entityType: 'session' });
     console.log('[Auth] Cookie JWT issued for:', req.user.email);
     res.redirect(`${getRedirectFrontendUrl(req)}/location?auth=1`);
+    } catch (err) { next(err); }
   }
 );
 
@@ -65,7 +69,7 @@ router.post('/location', requireAuth, (req, res) => {
   res.json({ ok: true });
 });
 
-router.post('/logout', (req, res) => {
+router.post('/logout', async (req, res, next) => {
   const payload = readAuthPayload(req);
   if (payload) {
     const user = publicUserFromPayload(payload);
@@ -73,8 +77,14 @@ router.post('/logout', (req, res) => {
       return res.status(403).json({ error: 'Invalid CSRF token' });
     }
   }
-  clearAuthCookie(res);
-  res.json({ ok: true });
+  try {
+    if (payload) {
+      req.user = publicUserFromPayload(payload);
+      await recordAudit(req, { action: 'LOGOUT', entityType: 'session' });
+    }
+    clearAuthCookie(res);
+    res.json({ ok: true });
+  } catch (err) { next(err); }
 });
 
 module.exports = router;

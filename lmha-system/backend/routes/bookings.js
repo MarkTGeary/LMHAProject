@@ -3,6 +3,7 @@ const router = express.Router();
 const db = require('../db');
 const { LOCATION_RULES } = require('../lib/constants');
 const { badRequest, conflict, forbidden, notFound } = require('../lib/errors');
+const { recordAudit } = require('../services/audit');
 const { slotsForBooking, timeToMinutes, toLockConflict } = require('../lib/bookingLocks');
 const {
   assertRequestLocation,
@@ -273,6 +274,10 @@ router.get('/:id', async (req, res, next) => {
     });
     if (!result.rows.length) throw notFound();
     assertBookingIsInCurrentLocation(req, result.rows[0]);
+    await recordAudit(req, {
+      action: 'VIEW', entityType: 'booking', entityId: id,
+      serviceUserId: result.rows[0].service_user_id, location: result.rows[0].location,
+    });
     res.json(result.rows[0]);
   } catch (err) { next(err); }
 });
@@ -367,6 +372,11 @@ router.post('/', async (req, res, next) => {
     const booking = await db.execute({
       sql: 'SELECT * FROM bookings WHERE id = ?',
       args: [bookingId],
+    });
+    await recordAudit(req, {
+      action: 'CREATE', entityType: 'booking', entityId: bookingId,
+      serviceUserId: booking.rows[0].service_user_id, location,
+      changedFields: Object.keys(req.body || {}),
     });
     res.status(201).json(booking.rows[0]);
   } catch (err) { next(err); }
@@ -479,6 +489,13 @@ router.patch('/:id', async (req, res, next) => {
     const fieldNames = Object.keys(values);
     if (!fieldNames.length) {
       const updated = await db.execute({ sql: 'SELECT * FROM bookings WHERE id = ?', args: [id] });
+      const personFields = ['full_name', 'phone'].filter(field => hasOwn(req.body, field));
+      if (personFields.length) {
+        await recordAudit(req, {
+          action: 'UPDATE', entityType: 'service_user', entityId: existing.service_user_id,
+          serviceUserId: existing.service_user_id, location: existing.location, changedFields: personFields,
+        });
+      }
       return res.json(updated.rows[0]);
     }
 
@@ -500,6 +517,12 @@ router.patch('/:id', async (req, res, next) => {
     const updated = await db.execute({
       sql: 'SELECT * FROM bookings WHERE id = ?',
       args: [id],
+    });
+    const changedFields = [...fieldNames, ...['full_name', 'phone'].filter(field => hasOwn(req.body, field))];
+    await recordAudit(req, {
+      action: 'UPDATE', entityType: 'booking', entityId: id,
+      serviceUserId: updated.rows[0].service_user_id, location: updated.rows[0].location,
+      changedFields,
     });
     res.json(updated.rows[0]);
   } catch (err) { next(err); }

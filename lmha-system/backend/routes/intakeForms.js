@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const db = require('../db');
 const { badRequest, forbidden, notFound } = require('../lib/errors');
+const { recordAudit } = require('../services/audit');
 const {
   assertRequestLocation,
   booleanInt,
@@ -178,6 +179,10 @@ router.get('/booking/:bookingId', async (req, res, next) => {
       args: [bookingId],
     });
     if (!result.rows.length) throw notFound('No intake form for this booking');
+    await recordAudit(req, {
+      action: 'VIEW', entityType: 'intake_form', entityId: result.rows[0].id,
+      serviceUserId: result.rows[0].service_user_id, location: bookingResult.rows[0].location,
+    });
     res.json(parseStoredJson({ ...result.rows[0] }));
   } catch (err) { next(err); }
 });
@@ -351,6 +356,11 @@ router.post('/', async (req, res, next) => {
       args: [bookingId],
     });
     const form = parseStoredJson({ ...formResult.rows[0] });
+    await recordAudit(req, {
+      action: existingForm.rows.length ? 'UPDATE' : 'CREATE', entityType: 'intake_form',
+      entityId: form.id, serviceUserId: userId, location: booking.location,
+      changedFields: Object.keys(req.body || {}),
+    });
     res.status(201).json({ intake: form, service_user_id: userId });
   } catch (err) { next(err); }
 });

@@ -17,6 +17,47 @@ export default function Settings() {
   const [erasing, setErasing] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
+  const [auditOpen, setAuditOpen] = useState(false)
+  const [auditEvents, setAuditEvents] = useState([])
+  const [auditLoading, setAuditLoading] = useState(false)
+  const [auditPage, setAuditPage] = useState(1)
+  const [auditTotal, setAuditTotal] = useState(0)
+  const [auditAction, setAuditAction] = useState('')
+
+  const loadAudit = async (page = 1, action = auditAction) => {
+    setAuditLoading(true)
+    try {
+      const query = new URLSearchParams({ page: String(page), limit: '25' })
+      if (action) query.set('action', action)
+      const res = await apiFetch(`/api/admin/audit-events?${query}`)
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Failed to load audit log')
+      setAuditEvents(data.events || [])
+      setAuditPage(data.page || page)
+      setAuditTotal(data.total || 0)
+    } catch {
+      setAuditEvents([])
+    }
+    setAuditLoading(false)
+  }
+
+  const toggleAudit = () => {
+    const next = !auditOpen
+    setAuditOpen(next)
+    if (next && auditEvents.length === 0) loadAudit(1)
+  }
+
+  const formatAuditTime = value => {
+    if (!value) return ''
+    return new Date(`${value.replace(' ', 'T')}Z`).toLocaleString('en-IE', {
+      timeZone: 'Europe/Dublin', dateStyle: 'short', timeStyle: 'short',
+    })
+  }
+
+  const auditLabel = event => {
+    const target = event.entity_id ? ` #${event.entity_id}` : ''
+    return `${event.action.replace('_', ' ')} ${event.entity_type.replaceAll('_', ' ')}${target}`
+  }
 
   const load = () => {
     setLoading(true)
@@ -286,6 +327,82 @@ export default function Settings() {
               </p>
             )}
           </div>
+        </div>
+
+        <div className="card">
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <h2 className="text-xl font-bold mb-1">Audit Log</h2>
+              <p className="text-sm text-gray-500">Review access, changes, anonymisation and exports.</p>
+            </div>
+            <button type="button" onClick={toggleAudit} className="btn-secondary btn-sm shrink-0">
+              {auditOpen ? 'Hide' : 'View audit log'}
+            </button>
+          </div>
+
+          {auditOpen && (
+            <div className="mt-5 border-t border-gray-100 pt-4">
+              <div className="flex items-center gap-2 mb-4">
+                <label htmlFor="audit-action" className="text-sm font-medium text-gray-700">Action</label>
+                <select
+                  id="audit-action"
+                  className="input py-2 flex-1"
+                  value={auditAction}
+                  onChange={event => {
+                    const action = event.target.value
+                    setAuditAction(action)
+                    loadAudit(1, action)
+                  }}
+                >
+                  <option value="">All actions</option>
+                  {['VIEW', 'SEARCH', 'CREATE', 'UPDATE', 'ANONYMISE', 'EXPORT', 'ACCESS_CHANGE', 'LOGIN', 'LOGOUT'].map(action => (
+                    <option key={action} value={action}>{action.replace('_', ' ')}</option>
+                  ))}
+                </select>
+              </div>
+
+              {auditLoading ? (
+                <p className="text-sm text-gray-400 py-5 text-center">Loading...</p>
+              ) : auditEvents.length === 0 ? (
+                <p className="text-sm text-gray-400 py-5 text-center">No matching audit events.</p>
+              ) : (
+                <ul className="divide-y divide-gray-100">
+                  {auditEvents.map(event => (
+                    <li key={event.id} className="py-3">
+                      <div className={`text-sm font-semibold ${event.outcome === 'FAILURE' ? 'text-red-700' : 'text-gray-800'}`}>
+                        {auditLabel(event)}{event.outcome === 'FAILURE' ? ' — failed' : ''}
+                      </div>
+                      <div className="text-xs text-gray-500 mt-1 break-all">
+                        {event.actor_email} · {formatAuditTime(event.occurred_at)}
+                        {event.location ? ` · ${event.location}` : ''}
+                      </div>
+                      {event.changed_fields?.length > 0 && (
+                        <div className="text-xs text-gray-400 mt-1">
+                          Fields: {event.changed_fields.join(', ')}
+                        </div>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              )}
+
+              <div className="flex items-center justify-between mt-4 pt-3 border-t border-gray-100">
+                <span className="text-xs text-gray-500">{auditTotal} events</span>
+                <div className="flex gap-2">
+                  <button
+                    type="button" className="btn-secondary btn-sm"
+                    disabled={auditPage <= 1 || auditLoading}
+                    onClick={() => loadAudit(auditPage - 1)}
+                  >Previous</button>
+                  <button
+                    type="button" className="btn-secondary btn-sm"
+                    disabled={auditPage * 25 >= auditTotal || auditLoading}
+                    onClick={() => loadAudit(auditPage + 1)}
+                  >Next</button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
       </div>

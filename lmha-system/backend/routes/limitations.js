@@ -3,6 +3,7 @@ const router = express.Router();
 const db = require('../db');
 const { assertRequestLocation, enumArray, parseDateString, parseId } = require('../lib/validation');
 const { badRequest } = require('../lib/errors');
+const { recordAudit } = require('../services/audit');
 
 const VALID_LIMITATIONS = [
   'monday', 'tuesday', 'wednesday',
@@ -42,6 +43,10 @@ router.post('/', async (req, res, next) => {
       sql: `INSERT INTO standalone_limitations (location, date, limitations_detail, notes)
             VALUES (?, ?, ?, ?)`,
       args: [location, date, JSON.stringify(limitations_detail), cleanNotes],
+    });
+    await recordAudit(req, {
+      action: 'CREATE', entityType: 'limitation', entityId: Number(result.lastInsertRowid),
+      location, changedFields: ['date', 'limitations_detail', ...(cleanNotes ? ['notes'] : [])],
     });
     res.json({ ok: true, id: Number(result.lastInsertRowid) });
   } catch (err) { next(err); }

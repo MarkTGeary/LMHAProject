@@ -113,6 +113,19 @@ export default function MetricsDashboard() {
     setSubmitting(false)
   }
 
+  const printReport = async () => {
+    try {
+      await apiFetch('/api/metrics/export-event', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ location, start, end }),
+      })
+    } catch {
+      // Printing remains available if audit recording is temporarily unavailable.
+    }
+    window.print()
+  }
+
   const setThisWeek = () => {
     const mon = getMondayOfWeek(new Date())
     const sun = new Date(mon); sun.setDate(mon.getDate() + 6)
@@ -195,7 +208,7 @@ export default function MetricsDashboard() {
 
             <div className="flex gap-3">
               <button
-                onClick={() => window.print()}
+                onClick={printReport}
                 className="btn-secondary btn-lg flex-1 no-print"
               >
                 🖨️ Print Report

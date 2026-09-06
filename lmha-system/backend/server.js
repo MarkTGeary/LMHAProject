@@ -1,5 +1,6 @@
 require('dotenv').config();
 const express = require('express');
+const crypto = require('crypto');
 const passport = require('passport');
 const GoogleStrategy = require('passport-google-oauth20').Strategy;
 const cors = require('cors');
@@ -10,6 +11,7 @@ const {
   getFrontendUrls,
   getPrimaryFrontendUrl,
   getRootAdminEmail,
+  isRootAdminEmail,
   validateProductionEnv,
 } = require('./lib/config');
 
@@ -17,6 +19,7 @@ validateProductionEnv();
 
 const db = require('./db');
 const { createRateLimit, securityHeaders } = require('./middleware/security');
+const { recordAudit } = require('./services/audit');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -30,6 +33,11 @@ const PROTECTED_EMAIL = getRootAdminEmail();
 app.set('trust proxy', 1);
 app.disable('x-powered-by');
 app.use(securityHeaders);
+app.use((req, res, next) => {
+  req.requestId = req.get('x-request-id') || crypto.randomUUID();
+  res.set('X-Request-Id', req.requestId);
+  next();
+});
 app.use(cors({
   origin(origin, cb) {
     if (!origin || FRONTEND_URLS.includes(origin)) return cb(null, true);
@@ -48,17 +56,22 @@ passport.use(new GoogleStrategy(
     clientID: process.env.GOOGLE_CLIENT_ID,
     clientSecret: process.env.GOOGLE_CLIENT_SECRET,
     callbackURL: `${BACKEND_URL}/auth/google/callback`,
+    passReqToCallback: true,
   },
-  async (accessToken, refreshToken, profile, done) => {
+  async (req, accessToken, refreshToken, profile, done) => {
     const email = (profile.emails?.[0]?.value || '').toLowerCase();
 
     try {
       const result = await db.execute({
-        sql: 'SELECT 1 FROM allowed_emails WHERE email = ?',
+        sql: 'SELECT role FROM allowed_emails WHERE email = ?',
         args: [email],
       });
       if (!result.rows.length) {
         console.warn(`[Auth] Rejected login attempt from: ${email}`);
+        await recordAudit({ user: null, requestId: req.requestId }, {
+          actorEmail: email || 'unknown', actorRole: 'unknown', action: 'LOGIN',
+          outcome: 'FAILURE', entityType: 'session',
+        });
         return done(null, false, { message: 'Email not on allowlist' });
       }
     } catch (err) {
@@ -70,6 +83,7 @@ passport.use(new GoogleStrategy(
       email,
       name: profile.displayName,
       picture: profile.photos?.[0]?.value || null,
+      role: isRootAdminEmail(email) ? 'admin' : (result.rows[0].role || 'worker'),
     };
 
     console.log(`[Auth] Login: ${email}`);
