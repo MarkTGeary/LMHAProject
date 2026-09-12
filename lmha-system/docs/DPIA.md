@@ -5,10 +5,10 @@
 | Document control | Value |
 |---|---|
 | Status | Draft — organisational review and approval required |
-| Version | 0.1 |
-| Prepared | 6 September 2026 |
-| Data controller | **TBD: confirm LMHA legal entity and registered address** |
-| Project owner | **TBD** |
+| Version | 0.2 |
+| Prepared | 12 September 2026 |
+| Data controller | Limerick Mental Health Association — **legal entity status and full address to be confirmed; postcode supplied: V94 E6HD** |
+| Project owner | Limerick Mental Health Association — **named accountable person required** |
 | DPIA owner | **TBD** |
 | DPO/data-protection adviser | **TBD: name or state why a DPO is not required** |
 | Review date | Before live personal data; then annually and after material change |
@@ -57,8 +57,9 @@ and, where necessary, an updated DPIA and privacy notice.
 - emergency contacts, GPs and referrers named by service users;
 - staff, administrators and volunteers using the system.
 
-**TBD:** confirm whether anyone under 18 may be recorded. If yes, stop and expand
-this DPIA for children's data, safeguarding, consent/authority and age-appropriate transparency.
+The service has confirmed that people under 18 are not in scope. The application
+must not be used to record an under-18 without first expanding this DPIA for
+children's data, safeguarding, consent/authority and age-appropriate transparency.
 
 ### Data categories
 
@@ -78,8 +79,11 @@ identity documents, passwords, or unrestricted clinical records.
 
 ### Scale and frequency
 
-**TBD:** estimated current records, annual new records, number of staff, geographic
-area, expected lifetime of the system, and whether processing is considered large scale.
+The current estimate is 20–60 service users, with annual new records likely to be
+in the hundreds. Approximately 10 staff will use the system. Service delivery is
+limited to Limerick. The expected system lifetime and more reliable annual volume
+must be confirmed after the first operating year. LMHA must document whether the
+processing is considered large scale after taking advice.
 
 ## 4. Data flow
 
@@ -96,7 +100,13 @@ flowchart LR
 The browser receives client information needed for the selected workflow. The
 backend validates the signed authentication cookie, CSRF token and selected location.
 Google OAuth supplies staff identity. Case records remain in Turso. The intended
-Google Sheets transfer contains aggregate metrics, not names or case notes.
+Google Sheets transfer contains aggregate totals, not names or case notes. Reports
+may be downloaded but are not normally printed; the download location, access and
+deletion arrangements remain to be defined.
+
+The reported deployment regions are Ireland for Turso and EU West for Vercel/Render.
+These are unverified operational statements and must be confirmed from each provider's
+production configuration and contractual documentation.
 
 **TBD before approval:**
 
@@ -123,9 +133,12 @@ LMHA, as controller, must record both:
 | Staff access administration | **TBD** | Normally not applicable unless sensitive staff data is used | **TBD** |
 
 Do not assume ordinary consent is the correct basis simply because acknowledgements
-appear on the intake form. Consent must be freely given and withdrawable, which may
+appear on the intake form. LMHA currently reports relying on consent, but it is
+unknown whether a person can receive support after refusing recording. Consent must
+be freely given and withdrawable, which may
 not fit essential service administration or crisis contexts. Obtain advice appropriate
-to LMHA's actual services and statutory/funder obligations.
+to LMHA's combined mental-health conversation, peer/social care and crisis-support
+services, its HSE funding, and its obligation to report aggregate metrics to the HSE.
 
 Necessity is provisionally supported because centralised scheduling and case continuity
 cannot be achieved reliably from aggregate data alone. Proportionality is conditional
@@ -162,6 +175,16 @@ workflow, exemptions review and response log.
 - audit metadata records field names rather than sensitive before/after values; and
 - bounded list/search responses and aggregate-only reporting design.
 
+The intended access model currently gives every worker access to both locations and
+all service users. Access removal is intended to occur the same day a worker leaves.
+The suggestion that any worker could be made an administrator is not an approved
+control: administrator rights include staff-access management, audit-log access and
+client anonymisation and must be limited to specifically authorised personnel.
+
+Staff are expected to use charity-owned devices, which may be shared. Encryption and
+automatic screen locking have been assumed but not verified. Remote access is not
+expected, but this also requires an explicit policy rather than an assumption.
+
 These controls require production configuration and operational testing; code review
 alone does not prove the controls operate correctly in the deployed environment.
 
@@ -173,20 +196,20 @@ after evidence is attached.
 
 | ID | Risk to individuals | Likelihood | Severity | Initial risk | Required treatment before live use | Target residual risk |
 |---|---|---:|---:|---:|---|---:|
-| R1 | Unauthorised staff access or excessive cross-location access exposes sensitive case data | Medium | High | High | Approve least-privilege model; decide whether workers require both locations; quarterly access review; immediate leaver process; individual accounts and MFA | Medium |
-| R2 | Compromised OAuth, hosting or database credential exposes records | Medium | High | High | Organisational ownership, MFA, password manager, credential rotation, restricted provider roles and incident alerts | Medium |
+| R1 | Unauthorised staff access or excessive access exposes sensitive case data; all workers are currently intended to see all records | Medium | High | High | Document why organisation-wide access is necessary; limit administrator rights to named authorised personnel; quarterly access review; same-day leaver removal; individual accounts and MFA | Medium |
+| R2 | Compromised OAuth, hosting or database credential exposes records; production accounts are personally owned by Mark Geary | High | High | High | Transfer GitHub, Vercel, Render, Turso and Google ownership to LMHA-controlled accounts; MFA, password manager, credential rotation, restricted provider roles and alerts | Medium |
 | R3 | Indefinite retention causes unnecessary harm or unlawful storage | High | High | High | Approve category-specific retention schedule; implement review/deletion/anonymisation process including backups and Sheets | Medium |
 | R4 | Incomplete lawful-basis or Article 9 analysis makes processing unfair/unlawful | Medium | High | High | Controller/DPO/legal approval of the table in section 5 before collection | Low |
 | R5 | People are not properly informed or cannot exercise their rights | Medium | High | High | Issue privacy notice and rights procedures; train staff; test a mock access and erasure request | Medium |
 | R6 | A breach is missed, investigated late, or not notified in time | Medium | High | High | Breach plan, named response team, provider contacts, breach register, notification decision process and exercises | Medium |
-| R7 | Data loss or corruption harms service continuity or record accuracy | Medium | High | High | Automated backups, documented RPO/RTO, restore permissions and successful scheduled restore test | Medium |
-| R8 | Identifying or small-number information is disclosed through Google Sheets, printouts or shared screens | Medium | High | High | Verify exports; restrict sheet sharing; small-cell review; printer/clear-desk procedure; tablet auto-lock and privacy screens where appropriate | Medium |
+| R7 | Data loss or corruption harms service continuity or record accuracy; no backup process is currently confirmed | High | High | High | Automated backups, documented RPO/RTO, restore permissions and successful scheduled restore test | Medium |
+| R8 | Identifying information is disclosed through Google Sheets, downloaded reports or shared devices | Medium | High | High | Verify exports contain totals only; restrict sheet and download access; approve download storage/deletion; verify tablet encryption/auto-lock and use individual logins on shared devices | Medium |
 | R9 | Third-party providers or international transfers lack adequate terms/safeguards | Medium | High | High | Supplier due diligence, Article 28 terms, subprocessor/region record, transfer assessment and SCCs/adequacy evidence where needed | Medium |
 | R10 | Free-text fields contain excessive or inaccurate clinical/safeguarding detail | High | High | High | Staff guidance, mandatory training, periodic quality review and minimisation prompts; prohibit speculation and irrelevant third-party detail | Medium |
 | R11 | Audit logs themselves reveal sensitive service use or are misused | Low | High | Medium | Admin-only access, access reviews, retention period, monitoring and no sensitive values in metadata | Low |
 | R12 | An anonymisation request leaves identity in free text, audit, backups or exports | Medium | High | High | Human review checklist across all stores; define backup suppression; verify result; retain only defensible non-identifying evidence | Medium |
 | R13 | Vulnerable person suffers distress, stigma, discrimination or safety risk following disclosure | Medium | High | High | Complete all High-risk controls, minimise collection, confidentiality training, rapid containment/support process | Medium |
-| R14 | Vendor outage prevents access during a crisis | Medium | High | High | Business-continuity fallback that does not create uncontrolled copies; provider monitoring and recovery runbook | Medium |
+| R14 | Vendor outage prevents access during a crisis | Medium | High | High | Formalise the proposed paper fallback, secure it, define later reconciliation/destruction, and add provider monitoring and a recovery runbook | Medium |
 
 No initial High risk should be accepted without a named owner, evidence, residual-risk
 assessment and controller approval. If residual High risk remains that LMHA cannot
@@ -209,7 +232,7 @@ The following consultation must be recorded:
 
 - [ ] Confirm controller identity, owners and DPO/adviser involvement.
 - [ ] Approve Article 6 bases and Article 9 conditions with evidence.
-- [ ] Confirm whether under-18s are in scope.
+- [x] Confirm whether under-18s are in scope — confirmed no; record change trigger.
 - [ ] Approve and publish the privacy notice.
 - [ ] Approve the retention schedule and operational deletion/anonymisation procedure.
 - [ ] Complete supplier/transfer due diligence and processor agreements.
@@ -245,4 +268,3 @@ children, automated decision-making, or evidence that controls are ineffective.
 - [DPC: Self-Assessment Checklist](https://dataprotection.ie/en/organisations/resources-organisations/self-assessment-checklist)
 - [DPC: Prior Consultation](https://www.dataprotection.ie/en/organisations/know-your-obligations/data-protection-impact-assessments/prior-consultation)
 - [GDPR consolidated text](https://eur-lex.europa.eu/eli/reg/2016/679/oj)
-
